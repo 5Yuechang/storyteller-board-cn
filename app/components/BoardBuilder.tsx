@@ -44,7 +44,6 @@ export default function BoardBuilder() {
     if (selected.has('atheist') && selectedRoles.some((r) => r.alignment === 'minion' || r.alignment === 'demon')) result.push({type:'warn',text:'无神论者要求没有邪恶角色在场，与当前选择冲突。'});
     if (selected.has('balloonist')) result.push({type:'info',text:'气球驾驶员可能增加 0～1 名外来者；当前名额按标准人数表计算。'});
     if (selected.has('marionette')) result.push({type:'info',text:'提线木偶需要与恶魔邻座，安排座位时请检查。'});
-    if (selected.has('demon-placeholder')) result.push({type:'warn',text:'原图的恶魔区域缺失；当前恶魔仅用于占位，开局前请补充核对。'});
     return result;
   }, [quota, selected, selectedRoles, totals]);
 

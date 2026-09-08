@@ -40,7 +40,10 @@ export const scripts: ScriptDefinition[] = [{
     {id:'organ-grinder',name:'街头风琴手',alignment:'minion',timing:'被动',ability:'所有玩家在投票时闭眼，且票数会秘密统计。每个夜晚，你要选择自己是否醉酒直到下个黄昏。'},
     {id:'marionette',name:'提线木偶',alignment:'minion',timing:'被动',ability:'你以为你是一个善良角色，但其实你不是。恶魔会知道你是提线木偶。',setup:'与恶魔邻座'},
 
-    {id:'demon-placeholder',name:'恶魔（待核对）',alignment:'demon',timing:'每夜',ability:'上传图片在“恶魔”标题处截断，暂以此角色作为配板名额占位。补充完整原图后即可替换为真实恶魔列表。',note:'待补充原图'},
+    {id:'toy-maker',name:'童趣玩偶',alignment:'demon',timing:'每夜',ability:'每个夜晚*，你可以选择三名玩家（所有玩家都会得知你选了谁）：他们分别在三名玩家中秘密选择一名玩家，被选择最多的玩家死亡。如果只有一名玩家被选择，改为其他两名玩家死亡。'},
+    {id:'trolley-problem',name:'电车难题',alignment:'demon',timing:'每夜',ability:'每个夜晚*，你可以选择三名玩家（所有玩家都会得知前两名玩家是谁）：所有善良玩家分别秘密表决他们的生死，然后如果他们存活则第三名玩家死亡。'},
+    {id:'black-sun',name:'太阳黑子',alignment:'demon',timing:'每夜',ability:'每个夜晚*，你可以选择三名存活玩家（所有玩家都会得知前两名玩家是谁）：第三名玩家秘密决定他们中谁会被你杀死，然后如果他们都死亡，则所有玩家都会在下个黎明得知第三名玩家是谁。'},
+    {id:'hadi-jiya',name:'哈迪寂亚',alignment:'demon',timing:'每夜',ability:'每个夜晚*，你可以选择三名玩家（所有玩家都会得知你选了谁）：他们分别秘密决定自己的生死，然后如果他们都存活则都死亡。'},
   ]
 }];
 
