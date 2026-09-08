@@ -48,9 +48,11 @@ function RoleCard({ role, selected, locked, onSelect, onLock }: { role: Role; se
 function SeatMap({ seats, roles, activeSeat, onSelect }: { seats: Seat[]; roles: Role[]; activeSeat: number; onSelect: (number: number) => void }) {
   const aliveCount = seats.filter((seat) => seat.alive).length;
   const deathsUntilEvilWin = Math.max(0, aliveCount - 2);
+  const demonSeats = seats.filter((seat) => roles.find((role) => role.id === seat.roleId)?.alignment === 'demon');
+  const demonDefeated = demonSeats.length > 0 && demonSeats.every((seat) => !seat.alive);
   return <div className="seat-ring" aria-label={`${seats.length}人环形座位图`}>
     <div className="ring-lines" aria-hidden="true"><span/><span/><span/></div>
-    <div className="ring-center"><span>{aliveCount}</span><small>存活</small><b>{seats.length} 人魔典</b><em>{deathsUntilEvilWin ? `再死亡 ${deathsUntilEvilWin} 人` : '已到邪恶胜利线'}</em></div>
+    <div className={`ring-center ${demonDefeated ? 'is-good-win' : ''}`}><span>{aliveCount}</span><small>存活</small><b>{seats.length} 人魔典</b><em>{demonDefeated ? '恶魔死亡 · 善良胜利' : deathsUntilEvilWin ? `再死亡 ${deathsUntilEvilWin} 人` : '已到邪恶胜利线'}</em></div>
     {seats.map((seat, index) => {
       const angle = (index / seats.length) * Math.PI * 2;
       const role = roles.find((item) => item.id === seat.roleId);
@@ -112,6 +114,8 @@ export default function BoardBuilder() {
   const totals = useMemo(() => Object.fromEntries(alignments.map((alignment) => [alignment, selectedRoles.filter((role) => role.alignment === alignment).length])) as Record<Alignment, number>, [selectedRoles]);
   const aliveCount = seats.filter((seat) => seat.alive).length;
   const deathsUntilEvilWin = Math.max(0, aliveCount - 2);
+  const demonSeats = seats.filter((seat) => script.roles.find((role) => role.id === seat.roleId)?.alignment === 'demon');
+  const demonDefeated = demonSeats.length > 0 && demonSeats.every((seat) => !seat.alive);
 
   const messages = useMemo(() => {
     const result: { type: 'ok'|'warn'|'info'; text: string }[] = [];
@@ -226,7 +230,7 @@ export default function BoardBuilder() {
       <aside className="board-panel">
         <div className="board-heading"><div><span className="eyebrow">LIVE BOARD</span><h2>当前配板</h2></div><span className="total-count">{selectedRoles.length}<small>/{playerCount}</small></span></div>
         <div className="board-actions"><Button className="random-board" onClick={() => buildBoard(true)}><Dice5/>随机配板</Button><Button variant="outline" onClick={() => buildBoard(false)}><Sparkles/>按名额补齐</Button><Button variant="outline" onClick={() => { setSelected(new Set(locked)); resetRoundState(); }}><RotateCcw/>清空未锁定</Button></div>
-        <section className={`evil-win-status ${deathsUntilEvilWin === 0 ? 'is-at-line' : ''}`}><Skull/><div><span>邪恶方人数胜利线</span><strong>{deathsUntilEvilWin ? `还需死亡 ${deathsUntilEvilWin} 人` : '胜利人数条件已达成'}</strong><small>按存活玩家降至 2 人计算</small></div><b>{aliveCount}<small> 存活</small></b></section>
+        <section className={`evil-win-status ${demonDefeated ? 'is-good-win' : deathsUntilEvilWin === 0 ? 'is-at-line' : ''}`}>{demonDefeated ? <ShieldCheck/> : <Skull/>}<div><span>{demonDefeated ? '游戏胜负' : '邪恶方人数胜利线'}</span><strong>{demonDefeated ? '恶魔已死亡，善良方获胜' : deathsUntilEvilWin ? `还需死亡 ${deathsUntilEvilWin} 人` : '邪恶方胜利人数条件已达成'}</strong><small>{demonDefeated ? '角色能力另有说明时除外' : '所有阵营都计入存活人数；恶魔死亡则善良获胜'}</small></div><b>{aliveCount}<small> 存活</small></b></section>
         <div className="selected-groups">{alignments.map((alignment) => <section key={alignment} className={`selected-group group-${alignment}`}><div><span>{alignmentMeta[alignment].short}</span><b>{totals[alignment]} / {quota[alignment]}</b></div><ul>{selectedRoles.filter((role) => role.alignment === alignment).map((role) => <li key={role.id}><RoleIcon role={role} className="mini-role-icon"/>{role.name}{locked.has(role.id) && <Lock size={11}/>}</li>)}</ul>{!totals[alignment] && <p>尚未选择</p>}</section>)}</div>
         <section className="validation"><h3><ShieldCheck size={17}/>基础校验</h3><div className="message-list">{messages.map((message,index) => <div key={`${message.text}-${index}`} className={`message message-${message.type}`}>{message.type === 'warn' ? <AlertTriangle size={15}/> : message.type === 'ok' ? <Check size={15}/> : <CircleHelp size={15}/>}<span>{message.text}</span></div>)}</div></section>
       </aside>
