@@ -22,10 +22,15 @@ const shuffled = <T,>(items: T[]) => {
   return result;
 };
 
+function RoleIcon({ role, className = '' }: { role: Role; className?: string }) {
+  return <img className={`role-icon ${className}`} src={`/roles/${role.id}.webp`} alt="" aria-hidden="true"/>;
+}
+
 function RoleCard({ role, selected, locked, onSelect, onLock }: { role: Role; selected: boolean; locked: boolean; onSelect: () => void; onLock: () => void }) {
   return <article className={`role-card role-${role.alignment} ${selected ? 'is-selected' : ''}`}>
     <div className="role-topline">
       <Checkbox checked={selected} onCheckedChange={onSelect} aria-label={`选择${role.name}`} />
+      <RoleIcon role={role}/>
       <button className="role-name" onClick={onSelect}>{role.name}</button>
       <span className="timing">{role.timing}</span>
       <button className={`lock-button ${locked ? 'is-locked' : ''}`} onClick={onLock} aria-label={`${locked ? '取消锁定' : '锁定'}${role.name}`} title={locked ? '取消锁定' : '锁定角色'}><Lock size={14}/></button>
@@ -50,14 +55,19 @@ function SeatMap({ seats, roles, activeSeat, onSelect }: { seats: Seat[]; roles:
         aria-label={`${seat.number}号，${role?.name ?? '未分配'}，${seat.alive ? '存活' : '死亡'}`}
       >
         <span><b>{seat.number}号</b><i>{seat.alive ? '存活' : '死亡'}</i></span>
-        <strong>{role?.name ?? '未分配身份'}</strong>
+        <strong>{role && <RoleIcon role={role}/>}<span>{role?.name ?? '未分配身份'}</span></strong>
       </button>;
     })}
   </div>;
 }
 
 function NightList({ title, steps, selected, seats, roles, completed, onToggle }: { title: string; steps: NightStep[]; selected: Set<string>; seats: Seat[]; roles: Role[]; completed: Set<string>; onToggle: (id: string) => void }) {
-  const visible = steps.filter((step) => !step.roleId || selected.has(step.roleId));
+  const visible = steps.filter((step) => {
+    if (!step.roleId) return true;
+    if (!selected.has(step.roleId)) return false;
+    const assignedSeat = seats.find((seat) => seat.roleId === step.roleId);
+    return !assignedSeat || assignedSeat.alive;
+  });
   return <section className="night-list">
     <div className="night-list-heading"><div><span className="eyebrow">WAKE ORDER</span><h3>{title}</h3></div><b>{visible.filter((step) => completed.has(step.id)).length} / {visible.length}</b></div>
     <ol>{visible.map((step, index) => {
@@ -67,6 +77,7 @@ function NightList({ title, steps, selected, seats, roles, completed, onToggle }
       return <li key={step.id} className={`${completed.has(step.id) ? 'is-complete' : ''} ${skipped ? 'is-skipped' : ''}`}>
         <span className="night-index">{String(index + 1).padStart(2, '0')}</span>
         <Checkbox checked={completed.has(step.id)} onCheckedChange={() => onToggle(step.id)} aria-label={`完成${step.name}`}/>
+        {assignedRole ? <RoleIcon role={assignedRole} className="night-role-icon"/> : <span className="night-role-icon system-icon"><Moon/></span>}
         <button onClick={() => onToggle(step.id)}><strong>{step.name}</strong><small>{skipped ? '罂粟种植者在场，本项跳过' : step.note}</small></button>
         <span className={`phase phase-${step.phase}`}>{step.phase}</span>
         {assignedRole && <span className={`night-seat night-seat-${assignedRole.alignment}`}>{assignedSeat ? `${assignedSeat.number}号${assignedSeat.alive ? '' : ' · 已死亡'}` : '未入座'}</span>}
@@ -192,7 +203,7 @@ export default function BoardBuilder() {
       <aside className="board-panel">
         <div className="board-heading"><div><span className="eyebrow">LIVE BOARD</span><h2>当前配板</h2></div><span className="total-count">{selectedRoles.length}<small>/{playerCount}</small></span></div>
         <div className="board-actions"><Button className="random-board" onClick={() => buildBoard(true)}><Dice5/>随机配板</Button><Button variant="outline" onClick={() => buildBoard(false)}><Sparkles/>按名额补齐</Button><Button variant="outline" onClick={() => { setSelected(new Set(locked)); resetRoundState(); }}><RotateCcw/>清空未锁定</Button></div>
-        <div className="selected-groups">{alignments.map((alignment) => <section key={alignment} className={`selected-group group-${alignment}`}><div><span>{alignmentMeta[alignment].short}</span><b>{totals[alignment]} / {quota[alignment]}</b></div><ul>{selectedRoles.filter((role) => role.alignment === alignment).map((role) => <li key={role.id}>{role.name}{locked.has(role.id) && <Lock size={11}/>}</li>)}</ul>{!totals[alignment] && <p>尚未选择</p>}</section>)}</div>
+        <div className="selected-groups">{alignments.map((alignment) => <section key={alignment} className={`selected-group group-${alignment}`}><div><span>{alignmentMeta[alignment].short}</span><b>{totals[alignment]} / {quota[alignment]}</b></div><ul>{selectedRoles.filter((role) => role.alignment === alignment).map((role) => <li key={role.id}><RoleIcon role={role} className="mini-role-icon"/>{role.name}{locked.has(role.id) && <Lock size={11}/>}</li>)}</ul>{!totals[alignment] && <p>尚未选择</p>}</section>)}</div>
         <section className="validation"><h3><ShieldCheck size={17}/>基础校验</h3><div className="message-list">{messages.map((message,index) => <div key={`${message.text}-${index}`} className={`message message-${message.type}`}>{message.type === 'warn' ? <AlertTriangle size={15}/> : message.type === 'ok' ? <Check size={15}/> : <CircleHelp size={15}/>}<span>{message.text}</span></div>)}</div></section>
       </aside>
     </section>
