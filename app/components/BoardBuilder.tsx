@@ -10,9 +10,17 @@ import { alignmentMeta, scripts, type Alignment, type NightStep, type Role } fro
 
 const alignments: Alignment[] = ['townsfolk', 'outsider', 'minion', 'demon'];
 type ViewMode = 'roles' | 'seats' | 'night';
-type Seat = { number: number; roleId: string | null; alive: boolean };
+type SeatStatus = 'poisoned'|'drunk'|'protected'|'noAbility'|'abilityUsed'|'turnedGood'|'turnedEvil';
+type Seat = { number: number; roleId: string | null; alive: boolean; statuses: SeatStatus[] };
 
-const makeSeats = (count: number): Seat[] => Array.from({ length: count }, (_, index) => ({ number: index + 1, roleId: null, alive: true }));
+const seatStatusMeta: Record<SeatStatus, { label: string; short: string }> = {
+  poisoned:{label:'中毒',short:'毒'}, drunk:{label:'醉酒',short:'醉'}, protected:{label:'受保护',short:'护'},
+  noAbility:{label:'失去能力',short:'封'}, abilityUsed:{label:'能力已使用',short:'用'},
+  turnedGood:{label:'已转为善良',short:'善'}, turnedEvil:{label:'已转为邪恶',short:'恶'},
+};
+const seatStatuses = Object.keys(seatStatusMeta) as SeatStatus[];
+
+const makeSeats = (count: number): Seat[] => Array.from({ length: count }, (_, index) => ({ number: index + 1, roleId: null, alive: true, statuses: [] }));
 const withBalloonistSetup = (quota: Record<Alignment, number>, enabled: boolean): Record<Alignment, number> => enabled ? {
   ...quota,
   townsfolk: Math.max(0, quota.townsfolk - 1),
@@ -56,15 +64,17 @@ function SeatMap({ seats, roles, activeSeat, onSelect }: { seats: Seat[]; roles:
     {seats.map((seat, index) => {
       const angle = (index / seats.length) * Math.PI * 2;
       const role = roles.find((item) => item.id === seat.roleId);
+      const side = seat.statuses.includes('turnedEvil') ? 'evil' : seat.statuses.includes('turnedGood') ? 'good' : role && (role.alignment === 'minion' || role.alignment === 'demon') ? 'evil' : role ? 'good' : '';
       return <button
         key={seat.number}
-        className={`seat-token ${role ? `seat-${role.alignment}` : ''} ${seat.alive ? 'is-alive' : 'is-dead'} ${activeSeat === seat.number ? 'is-active' : ''}`}
+        className={`seat-token ${role ? `seat-${role.alignment}` : ''} ${side ? `seat-side-${side}` : ''} ${seat.alive ? 'is-alive' : 'is-dead'} ${activeSeat === seat.number ? 'is-active' : ''}`}
         style={{ left: `${50 + Math.sin(angle) * 43}%`, top: `${50 - Math.cos(angle) * 43}%` }}
         onClick={() => onSelect(seat.number)}
         aria-label={`${seat.number}号，${role?.name ?? '未分配'}，${seat.alive ? '存活' : '死亡'}`}
       >
         <span><b>{seat.number}号</b><i>{seat.alive ? '存活' : '死亡'}</i></span>
         <strong>{role && <RoleIcon role={role}/>}<span>{role?.name ?? '未分配身份'}</span></strong>
+        {!!seat.statuses.length && <span className="seat-status-list">{seat.statuses.map((status) => <i key={status} className={`seat-status status-${status}`} title={seatStatusMeta[status].label}>{seatStatusMeta[status].short}</i>)}</span>}
       </button>;
     })}
   </div>;
@@ -75,7 +85,10 @@ function NightList({ title, steps, selected, seats, roles, completed, onToggle }
     if (!step.roleId) return true;
     if (!selected.has(step.roleId)) return false;
     const assignedSeat = seats.find((seat) => seat.roleId === step.roleId);
-    return !assignedSeat || assignedSeat.alive;
+    if (!assignedSeat) return step.deadMode !== 'only';
+    if (step.deadMode === 'show') return true;
+    if (step.deadMode === 'only') return !assignedSeat.alive;
+    return assignedSeat.alive;
   });
   return <section className="night-list">
     <div className="night-list-heading"><div><span className="eyebrow">WAKE ORDER</span><h3>{title}</h3></div><b>{visible.filter((step) => completed.has(step.id)).length} / {visible.length}</b></div>
@@ -165,7 +178,7 @@ export default function BoardBuilder() {
   }
   function changePlayerCount(count: number) {
     setPlayerCount(count);
-    setSeats((current) => Array.from({ length:count }, (_, index) => current[index] ? { ...current[index], number:index + 1 } : { number:index + 1, roleId:null, alive:true }));
+    setSeats((current) => Array.from({ length:count }, (_, index) => current[index] ? { ...current[index], number:index + 1 } : { number:index + 1, roleId:null, alive:true, statuses:[] }));
     setActiveSeat((current) => Math.min(current, count));
     setCompletedSteps(new Set());
   }
@@ -180,7 +193,20 @@ export default function BoardBuilder() {
   }
   function randomizeSeats() {
     const roles = shuffled(selectedRoles);
-    setSeats((current) => current.map((seat, index) => ({ ...seat, roleId:roles[index]?.id ?? null })));
+    setSeats((current) => current.map((seat, index) => ({ ...seat, roleId:roles[index]?.id ?? null, alive:true, statuses:[] })));
+  }
+  function toggleSeatStatus(seatNumber: number, status: SeatStatus) {
+    setSeats((current) => current.map((seat) => {
+      if (seat.number !== seatNumber) return seat;
+      const next = new Set(seat.statuses);
+      if (next.has(status)) next.delete(status);
+      else {
+        next.add(status);
+        if (status === 'turnedGood') next.delete('turnedEvil');
+        if (status === 'turnedEvil') next.delete('turnedGood');
+      }
+      return { ...seat, statuses:Array.from(next) };
+    }));
   }
   function toggleNightStep(id: string) {
     setCompletedSteps((current) => { const next = new Set(current); next.has(id) ? next.delete(id) : next.add(id); return next; });
@@ -216,6 +242,7 @@ export default function BoardBuilder() {
             <div className="seat-editor-number"><span>{activeSeatState.number}</span><div><b>{activeSeatState.number}号座位</b><small>{activeSeatState.alive ? '当前存活' : '当前死亡'}</small></div></div>
             <label><span>身份</span><NativeSelect value={activeSeatState.roleId ?? ''} onChange={(event) => assignRole(activeSeatState.number, event.target.value || null)} aria-label={`${activeSeatState.number}号身份`}><NativeSelectOption value="">未分配身份</NativeSelectOption>{alignments.map((alignment) => <optgroup key={alignment} label={alignmentMeta[alignment].short}>{selectedRoles.filter((role) => role.alignment === alignment).map((role) => <NativeSelectOption key={role.id} value={role.id}>{role.name}</NativeSelectOption>)}</optgroup>)}</NativeSelect></label>
             <Button variant={activeSeatState.alive ? 'outline' : 'destructive'} onClick={() => setSeats((current) => current.map((seat) => seat.number === activeSeatState.number ? { ...seat, alive:!seat.alive } : seat))}>{activeSeatState.alive ? <><UserRound/>标记死亡</> : <><Sparkles/>恢复存活</>}</Button>
+            <div className="seat-status-editor"><span>状态标记</span><div>{seatStatuses.map((status) => <button key={status} className={`${activeSeatState.statuses.includes(status) ? 'is-active' : ''} status-${status}`} onClick={() => toggleSeatStatus(activeSeatState.number,status)} aria-pressed={activeSeatState.statuses.includes(status)}>{seatStatusMeta[status].short}<b>{seatStatusMeta[status].label}</b></button>)}</div></div>
           </div>
         </section>}
 

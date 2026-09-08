@@ -114,6 +114,8 @@ button,select { font:inherit; } button { cursor:pointer; }
 .seat-token.seat-outsider { border-color:#7f9fbd; background:linear-gradient(145deg,#f2f8fd 0%,#d6e5f1 100%); box-shadow:inset 3px 0 0 #6487a8,0 5px 13px #335f7a2b; }
 .seat-token.seat-minion,.seat-token.seat-demon { border-color:#bb746a; color:#772f29; background:linear-gradient(145deg,#fff7f4 0%,#f3dcd6 100%); box-shadow:inset 3px 0 0 #b44e43,0 5px 13px #783d352b; }
 .seat-token.seat-demon { border-color:#a8564d; background:linear-gradient(145deg,#fff2ee 0%,#edcbc4 100%); box-shadow:inset 4px 0 0 #923b32,0 5px 13px #783d3538; }
+.seat-token.seat-side-good { border-color:#6b9dbd; color:#174e72; background:linear-gradient(145deg,#f5fbff 0%,#dceef9 100%); box-shadow:inset 3px 0 0 #3e83b3,0 5px 13px #335f7a2b; }
+.seat-token.seat-side-evil { border-color:#b45e54; color:#772f29; background:linear-gradient(145deg,#fff5f1 0%,#efd4ce 100%); box-shadow:inset 4px 0 0 #9e4137,0 5px 13px #783d3538; }
 .seat-token:hover { z-index:5; transform:translate(-50%,-50%) scale(1.04); }
 .seat-token.is-active { z-index:5; outline:3px solid #bd943d88; border-color:#987226; box-shadow:0 8px 19px #4d423344; }
 .seat-token>span { display:flex; align-items:center; justify-content:space-between; gap:4px; }
@@ -123,6 +125,12 @@ button,select { font:inherit; } button { cursor:pointer; }
 .seat-token strong span { overflow:hidden; text-overflow:ellipsis; }
 .seat-token strong .role-icon { width:25px; height:25px; border-color:#ffffffbb; }
 .seat-token.seat-minion strong,.seat-token.seat-demon strong { color:#8e3e35; }
+.seat-status-list { display:flex!important; justify-content:center!important; gap:3px!important; margin-top:4px; }
+.seat-status { width:17px; height:17px; display:grid; place-items:center; border:1px solid #947b54; border-radius:50%; color:#fff!important; background:#836b42; font-size:9px!important; font-style:normal; font-weight:900; }
+.seat-status.status-poisoned,.seat-status.status-noAbility { background:#704e80; }
+.seat-status.status-drunk,.seat-status.status-abilityUsed { background:#9b6b35; }
+.seat-status.status-protected,.seat-status.status-turnedGood { background:#377596; }
+.seat-status.status-turnedEvil { background:#9a3e35; }
 .seat-token.is-dead { filter:saturate(.42); opacity:.68; }
 .seat-token.is-dead i { color:#8b3b34; }
 .seat-token.is-dead strong { text-decoration:line-through; }
@@ -136,6 +144,16 @@ button,select { font:inherit; } button { cursor:pointer; }
 .seat-editor [data-slot="native-select-wrapper"] { width:100%; }
 .seat-editor [data-slot="native-select"] { height:37px; background:#faf7ef; }
 .seat-editor>button { height:37px; }
+.seat-status-editor { grid-column:1/-1; display:grid; gap:7px; padding-top:12px; border-top:1px solid #ded5c8; }
+.seat-status-editor>span { color:#706f67; font-size:10px; }
+.seat-status-editor>div { display:flex; flex-wrap:wrap; gap:6px; }
+.seat-status-editor button { display:flex; align-items:center; gap:6px; min-height:30px; padding:4px 9px 4px 5px; border:1px solid #d4cabb; border-radius:999px; color:#66655f; background:#f3efe6; font-size:11px; }
+.seat-status-editor button::first-letter { font-weight:900; }
+.seat-status-editor button b { font-size:10px; font-weight:600; }
+.seat-status-editor button.is-active { border-color:#6e5a35; color:#fff; background:#80683d; box-shadow:0 2px 7px #594b3228; }
+.seat-status-editor button.status-poisoned.is-active,.seat-status-editor button.status-noAbility.is-active { border-color:#654274; background:#765286; }
+.seat-status-editor button.status-protected.is-active,.seat-status-editor button.status-turnedGood.is-active { border-color:#2f6a8a; background:#397b9e; }
+.seat-status-editor button.status-turnedEvil.is-active { border-color:#87372f; background:#9a4137; }
 
 .night-toggle { display:flex; gap:6px; width:max-content; margin-bottom:12px; padding:4px; border-radius:8px; background:#e5ded0; }
 .night-toggle button { display:flex; align-items:center; gap:6px; height:32px; padding:0 14px; border:0; border-radius:6px; color:#62665f; background:transparent; font-size:12px; font-weight:700; }

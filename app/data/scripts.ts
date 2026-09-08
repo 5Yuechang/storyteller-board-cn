@@ -1,7 +1,7 @@
 export type Alignment = 'townsfolk' | 'outsider' | 'minion' | 'demon';
 export type Role = { id: string; name: string; alignment: Alignment; ability: string; timing?: '首夜' | '每夜' | '白天' | '被动' | '一次'; setup?: string; note?: string };
 export type PlayerCount = Record<Alignment, number>;
-export type NightStep = { id: string; name: string; note: string; roleId?: string; phase?: '信息'|'行动'|'结算' };
+export type NightStep = { id: string; name: string; note: string; roleId?: string; phase?: '信息'|'行动'|'结算'; deadMode?: 'show'|'only' };
 export type ScriptDefinition = { id: string; name: string; author: string; playerRange: [number, number]; description: string; counts: Record<number, PlayerCount>; roles: Role[]; nightOrder: { first: NightStep[]; other: NightStep[] } };
 
 const standardCounts: Record<number, PlayerCount> = {
@@ -59,12 +59,12 @@ export const scripts: ScriptDefinition[] = [{
       {id:'huntsman-first',name:'巡山人',note:'可选择一名存活玩家并检查落难少女。',roleId:'huntsman',phase:'行动'},
       {id:'fortune-teller-first',name:'占卜师',note:'选择两名玩家，给出是否包含恶魔的信息。',roleId:'fortune-teller',phase:'信息'},
       {id:'noble-first',name:'贵族',note:'展示三名玩家，其中恰有一名邪恶。',roleId:'noble',phase:'信息'},
-      {id:'innkeeper-first',name:'店小二',note:'展示两名善良玩家，并处理其中一人醉酒。',roleId:'innkeeper',phase:'信息'},
+      {id:'innkeeper-first',name:'店小二',note:'展示两名善良玩家，并处理其中一人醉酒；死亡后仍会获得信息。',roleId:'innkeeper',phase:'信息',deadMode:'show'},
       {id:'balloonist-first',name:'气球驾驶员',note:'展示第一名玩家，记录其角色类型。',roleId:'balloonist',phase:'信息'},
       {id:'amnesiac-first',name:'失忆者',note:'按本局自定义能力执行。',roleId:'amnesiac',phase:'行动'},
     ],
     other:[
-      {id:'poppy-death',name:'罂粟种植者',note:'若其死亡，安排邪恶阵营在本夜互相认识。',roleId:'poppy-grower',phase:'结算'},
+      {id:'poppy-death',name:'罂粟种植者',note:'其死亡后，安排邪恶阵营在本夜互相认识。',roleId:'poppy-grower',phase:'结算',deadMode:'only'},
       {id:'preacher-other',name:'传教士',note:'选择一名玩家；若为爪牙，处理失去能力。',roleId:'preacher',phase:'行动'},
       {id:'snake-charmer-other',name:'舞蛇人',note:'选择一名存活玩家，检查是否与恶魔交换。',roleId:'snake-charmer',phase:'行动'},
       {id:'professor-other',name:'教授',note:'若发动能力，选择一名死亡玩家并检查是否复活。',roleId:'professor',phase:'行动'},
@@ -77,7 +77,7 @@ export const scripts: ScriptDefinition[] = [{
       {id:'hadi-jiya-other',name:'哈迪寂亚',note:'选择三名玩家，让他们分别秘密决定自己的生死。',roleId:'hadi-jiya',phase:'行动'},
       {id:'fortune-teller-other',name:'占卜师',note:'选择两名玩家，给出是否包含恶魔的信息。',roleId:'fortune-teller',phase:'信息'},
       {id:'balloonist-other',name:'气球驾驶员',note:'展示一名与上次角色类型不同的玩家。',roleId:'balloonist',phase:'信息'},
-      {id:'banshee-other',name:'秉笔',note:'若本日或本夜死亡，按死亡时段展示对应阵营玩家。',roleId:'banshee',phase:'信息'},
+      {id:'banshee-other',name:'秉笔',note:'本日或本夜死亡后，按死亡时段展示对应阵营玩家。',roleId:'banshee',phase:'信息',deadMode:'only'},
       {id:'amnesiac-other',name:'失忆者',note:'按本局自定义能力执行。',roleId:'amnesiac',phase:'行动'},
     ]
   }
