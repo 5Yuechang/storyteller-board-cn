@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { AlertTriangle, Check, CircleHelp, Dice5, LayoutGrid, Lock, Moon, RotateCcw, ShieldCheck, Shuffle, Sparkles, Sunrise, UserRound, Users } from 'lucide-react';
+import { AlertTriangle, Check, CircleHelp, Dice5, LayoutGrid, Lock, Moon, RotateCcw, ShieldCheck, Shuffle, Skull, Sparkles, Sunrise, UserRound, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
@@ -13,6 +13,11 @@ type ViewMode = 'roles' | 'seats' | 'night';
 type Seat = { number: number; roleId: string | null; alive: boolean };
 
 const makeSeats = (count: number): Seat[] => Array.from({ length: count }, (_, index) => ({ number: index + 1, roleId: null, alive: true }));
+const withBalloonistSetup = (quota: Record<Alignment, number>, enabled: boolean): Record<Alignment, number> => enabled ? {
+  ...quota,
+  townsfolk: Math.max(0, quota.townsfolk - 1),
+  outsider: quota.outsider + 1,
+} : quota;
 const shuffled = <T,>(items: T[]) => {
   const result = [...items];
   for (let index = result.length - 1; index > 0; index -= 1) {
@@ -41,9 +46,11 @@ function RoleCard({ role, selected, locked, onSelect, onLock }: { role: Role; se
 }
 
 function SeatMap({ seats, roles, activeSeat, onSelect }: { seats: Seat[]; roles: Role[]; activeSeat: number; onSelect: (number: number) => void }) {
+  const aliveCount = seats.filter((seat) => seat.alive).length;
+  const deathsUntilEvilWin = Math.max(0, aliveCount - 2);
   return <div className="seat-ring" aria-label={`${seats.length}人环形座位图`}>
     <div className="ring-lines" aria-hidden="true"><span/><span/><span/></div>
-    <div className="ring-center"><span>{seats.filter((seat) => seat.alive).length}</span><small>存活</small><b>{seats.length} 人魔典</b></div>
+    <div className="ring-center"><span>{aliveCount}</span><small>存活</small><b>{seats.length} 人魔典</b><em>{deathsUntilEvilWin ? `再死亡 ${deathsUntilEvilWin} 人` : '已到邪恶胜利线'}</em></div>
     {seats.map((seat, index) => {
       const angle = (index / seats.length) * Math.PI * 2;
       const role = roles.find((item) => item.id === seat.roleId);
@@ -97,10 +104,14 @@ export default function BoardBuilder() {
   const [nightMode, setNightMode] = useState<'first'|'other'>('first');
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
   const script = scripts.find((item) => item.id === scriptId) ?? scripts[0];
-  const quota = script.counts[playerCount];
+  const baseQuota = script.counts[playerCount];
+  const balloonistSetupActive = selected.has('balloonist');
+  const quota = useMemo(() => withBalloonistSetup(baseQuota, balloonistSetupActive), [baseQuota, balloonistSetupActive]);
   const selectedRoles = script.roles.filter((role) => selected.has(role.id));
   const activeSeatState = seats.find((seat) => seat.number === activeSeat) ?? seats[0];
   const totals = useMemo(() => Object.fromEntries(alignments.map((alignment) => [alignment, selectedRoles.filter((role) => role.alignment === alignment).length])) as Record<Alignment, number>, [selectedRoles]);
+  const aliveCount = seats.filter((seat) => seat.alive).length;
+  const deathsUntilEvilWin = Math.max(0, aliveCount - 2);
 
   const messages = useMemo(() => {
     const result: { type: 'ok'|'warn'|'info'; text: string }[] = [];
@@ -108,7 +119,7 @@ export default function BoardBuilder() {
     result.push(!mismatches.length ? { type:'ok', text:'阵营名额已配齐，可以进入座位安排。' } : { type:'info', text:`还需调整：${mismatches.map((alignment) => `${alignmentMeta[alignment].short} ${totals[alignment]}/${quota[alignment]}`).join('、')}` });
     if (selected.has('damsel') && !selected.has('huntsman')) result.push({ type:'warn', text:'落难少女在场但没有巡山人；确认这是你想要的配置。' });
     if (selected.has('atheist') && selectedRoles.some((role) => role.alignment === 'minion' || role.alignment === 'demon')) result.push({ type:'warn', text:'无神论者要求没有邪恶角色在场，与当前选择冲突。' });
-    if (selected.has('balloonist')) result.push({ type:'info', text:'气球驾驶员可能增加 0～1 名外来者；当前名额按标准人数表计算。' });
+    if (selected.has('balloonist')) result.push({ type:'ok', text:'已应用气球驾驶员配置：镇民 -1，外来者 +1。' });
     if (selected.has('marionette')) result.push({ type:'info', text:'提线木偶需要与恶魔邻座，安排座位时请检查。' });
     const assignedCount = seats.filter((seat) => seat.roleId).length;
     if (assignedCount && assignedCount < playerCount) result.push({ type:'info', text:`座位身份已分配 ${assignedCount}/${playerCount}。` });
@@ -128,12 +139,24 @@ export default function BoardBuilder() {
   }
   function buildBoard(random: boolean) {
     const next = new Set(locked);
-    for (const alignment of alignments) {
+    const addToAlignment = (alignment: Alignment, target: number) => {
       const candidates = script.roles.filter((role) => role.alignment === alignment && !next.has(role.id));
       const already = script.roles.filter((role) => role.alignment === alignment && next.has(role.id)).length;
       const pool = random ? shuffled(candidates) : candidates;
-      pool.slice(0, Math.max(0, quota[alignment] - already)).forEach((role) => next.add(role.id));
+      pool.slice(0, Math.max(0, target - already)).forEach((role) => next.add(role.id));
+    };
+
+    addToAlignment('townsfolk', baseQuota.townsfolk);
+    const targetQuota = withBalloonistSetup(baseQuota, next.has('balloonist'));
+    if (next.has('balloonist')) {
+      const removableTownsfolk = script.roles.filter((role) => role.alignment === 'townsfolk' && role.id !== 'balloonist' && next.has(role.id) && !locked.has(role.id));
+      while (script.roles.filter((role) => role.alignment === 'townsfolk' && next.has(role.id)).length > targetQuota.townsfolk && removableTownsfolk.length) {
+        next.delete(removableTownsfolk.pop()!.id);
+      }
     }
+    addToAlignment('outsider', targetQuota.outsider);
+    addToAlignment('minion', targetQuota.minion);
+    addToAlignment('demon', targetQuota.demon);
     setSelected(next); setSeats(makeSeats(playerCount)); setCompletedSteps(new Set());
   }
   function changePlayerCount(count: number) {
@@ -170,7 +193,7 @@ export default function BoardBuilder() {
     <section className="workspace">
       <div className="catalog-panel">
         <div className="script-heading"><div><span className="eyebrow">当前剧本</span><h2>{script.name}</h2><p>{script.description}</p></div><span className="author">作者 · {script.author}</span></div>
-        <div className="quota-strip"><span className="quota-title"><Users size={16}/>{playerCount} 人标准名额</span>{alignments.map((alignment) => <span key={alignment} className={`quota quota-${alignment}`}>{alignmentMeta[alignment].short}<b>{quota[alignment]}</b></span>)}</div>
+        <div className="quota-strip"><span className="quota-title"><Users size={16}/>{playerCount} 人{balloonistSetupActive ? '调整后' : '标准'}名额</span>{alignments.map((alignment) => <span key={alignment} className={`quota quota-${alignment}`}>{alignmentMeta[alignment].short}<b>{quota[alignment]}</b></span>)}{balloonistSetupActive && <span className="quota-modifier">气球驾驶员：镇民 −1 · 外来者 +1</span>}</div>
         <nav className="workspace-nav" aria-label="工具视图">
           <button className={view === 'roles' ? 'is-active' : ''} onClick={() => setView('roles')}><LayoutGrid/>角色配板</button>
           <button className={view === 'seats' ? 'is-active' : ''} onClick={() => setView('seats')}><Users/>环形座位</button>
@@ -203,6 +226,7 @@ export default function BoardBuilder() {
       <aside className="board-panel">
         <div className="board-heading"><div><span className="eyebrow">LIVE BOARD</span><h2>当前配板</h2></div><span className="total-count">{selectedRoles.length}<small>/{playerCount}</small></span></div>
         <div className="board-actions"><Button className="random-board" onClick={() => buildBoard(true)}><Dice5/>随机配板</Button><Button variant="outline" onClick={() => buildBoard(false)}><Sparkles/>按名额补齐</Button><Button variant="outline" onClick={() => { setSelected(new Set(locked)); resetRoundState(); }}><RotateCcw/>清空未锁定</Button></div>
+        <section className={`evil-win-status ${deathsUntilEvilWin === 0 ? 'is-at-line' : ''}`}><Skull/><div><span>邪恶方人数胜利线</span><strong>{deathsUntilEvilWin ? `还需死亡 ${deathsUntilEvilWin} 人` : '胜利人数条件已达成'}</strong><small>按存活玩家降至 2 人计算</small></div><b>{aliveCount}<small> 存活</small></b></section>
         <div className="selected-groups">{alignments.map((alignment) => <section key={alignment} className={`selected-group group-${alignment}`}><div><span>{alignmentMeta[alignment].short}</span><b>{totals[alignment]} / {quota[alignment]}</b></div><ul>{selectedRoles.filter((role) => role.alignment === alignment).map((role) => <li key={role.id}><RoleIcon role={role} className="mini-role-icon"/>{role.name}{locked.has(role.id) && <Lock size={11}/>}</li>)}</ul>{!totals[alignment] && <p>尚未选择</p>}</section>)}</div>
         <section className="validation"><h3><ShieldCheck size={17}/>基础校验</h3><div className="message-list">{messages.map((message,index) => <div key={`${message.text}-${index}`} className={`message message-${message.type}`}>{message.type === 'warn' ? <AlertTriangle size={15}/> : message.type === 'ok' ? <Check size={15}/> : <CircleHelp size={15}/>}<span>{message.text}</span></div>)}</div></section>
       </aside>

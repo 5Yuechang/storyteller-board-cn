@@ -32,6 +32,7 @@ button,select { font:inherit; } button { cursor:pointer; }
 .quota b { font-size:15px; }
 .quota-townsfolk,.quota-outsider { color:#17617b; background:#dfebeb; }
 .quota-minion,.quota-demon { color:#923e34; background:#f0dfda; }
+.quota-modifier { padding:5px 9px; border:1px solid #b89b61; border-radius:6px; color:#745b29; background:#f5ead0; font-size:11px; font-weight:700; }
 .workspace-nav { display:flex; gap:5px; margin-bottom:16px; padding:5px; border:1px solid #d2c8b8; background:#e8e1d3; }
 .workspace-nav button { display:inline-flex; align-items:center; justify-content:center; gap:7px; min-width:132px; height:34px; border:0; border-radius:5px; background:transparent; color:#63675f; font-size:12px; font-weight:700; }
 .workspace-nav button svg { width:15px; }
@@ -67,6 +68,14 @@ button,select { font:inherit; } button { cursor:pointer; }
 .board-actions { display:grid; grid-template-columns:1fr 1fr; gap:7px; margin:14px 0; }
 .board-actions .random-board { grid-column:1/-1; background:#933e33; }
 .board-actions button { height:34px; font-size:12px; }
+.evil-win-status { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:10px; margin:0 0 12px; padding:11px; border:1px solid #d4b2aa; background:#f5e8e3; color:#8b3d35; }
+.evil-win-status>svg { width:22px; height:22px; }
+.evil-win-status>div { display:flex; flex-direction:column; gap:1px; }
+.evil-win-status span,.evil-win-status small { font-size:9px; }
+.evil-win-status strong { font-size:13px; }
+.evil-win-status>b { font-family:var(--font-display); font-size:23px; white-space:nowrap; }
+.evil-win-status>b small { font-family:var(--font-ui); font-weight:600; }
+.evil-win-status.is-at-line { border-color:#9b4b40; color:#fff7ef; background:#8e3c33; }
 .selected-groups { display:grid; gap:7px; }
 .selected-group { border:1px solid #d9d0c2; background:#fffdf8; padding:9px 10px; }
 .selected-group>div { display:flex; justify-content:space-between; font-size:12px; font-weight:700; }
@@ -96,6 +105,7 @@ button,select { font:inherit; } button { cursor:pointer; }
 .ring-center span { font-family:var(--font-display); font-size:35px; line-height:1; }
 .ring-center small { margin-top:2px; color:#bcd0cc; font-size:10px; letter-spacing:.18em; }
 .ring-center b { margin-top:7px; color:#c9aa6b; font-size:11px; }
+.ring-center em { margin-top:4px; color:#e6c78a; font-size:9px; font-style:normal; font-weight:800; }
 .seat-token { position:absolute; width:100px; min-height:57px; z-index:3; transform:translate(-50%,-50%); border:1px solid #b6aa98; border-radius:8px; padding:7px 8px; text-align:left; color:#435052; background:#fffdf8; box-shadow:0 5px 13px #564d4028; transition:.17s; }
 .seat-token:hover { z-index:5; transform:translate(-50%,-50%) scale(1.04); }
 .seat-token.is-active { z-index:5; outline:3px solid #bd943d88; border-color:#987226; box-shadow:0 8px 19px #4d423344; }
