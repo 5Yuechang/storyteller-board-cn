@@ -110,16 +110,20 @@ button,select { font:inherit; } button { cursor:pointer; }
 .ring-center.is-good-win { background:#285f49; box-shadow:0 0 0 7px #1c493a88; }
 .ring-center.is-good-win em { color:#d9f0df; }
 .seat-token { position:absolute; width:100px; min-height:57px; z-index:3; transform:translate(-50%,-50%); border:1px solid #b6aa98; border-radius:8px; padding:7px 8px; text-align:left; color:#435052; background:#fffdf8; box-shadow:0 5px 13px #564d4028; transition:.17s; }
+.seat-token.seat-townsfolk,.seat-token.seat-outsider { border-color:#6b9dbd; color:#174e72; background:linear-gradient(145deg,#f5fbff 0%,#dceef9 100%); box-shadow:inset 3px 0 0 #3e83b3,0 5px 13px #335f7a2b; }
+.seat-token.seat-outsider { border-color:#7f9fbd; background:linear-gradient(145deg,#f2f8fd 0%,#d6e5f1 100%); box-shadow:inset 3px 0 0 #6487a8,0 5px 13px #335f7a2b; }
+.seat-token.seat-minion,.seat-token.seat-demon { border-color:#bb746a; color:#772f29; background:linear-gradient(145deg,#fff7f4 0%,#f3dcd6 100%); box-shadow:inset 3px 0 0 #b44e43,0 5px 13px #783d352b; }
+.seat-token.seat-demon { border-color:#a8564d; background:linear-gradient(145deg,#fff2ee 0%,#edcbc4 100%); box-shadow:inset 4px 0 0 #923b32,0 5px 13px #783d3538; }
 .seat-token:hover { z-index:5; transform:translate(-50%,-50%) scale(1.04); }
 .seat-token.is-active { z-index:5; outline:3px solid #bd943d88; border-color:#987226; box-shadow:0 8px 19px #4d423344; }
 .seat-token>span { display:flex; align-items:center; justify-content:space-between; gap:4px; }
-.seat-token b { color:#77746c; font-size:10px; }
+.seat-token b { color:currentColor; opacity:.72; font-size:10px; }
 .seat-token i { color:#347055; font-size:9px; font-style:normal; font-weight:800; }
 .seat-token strong { display:flex; align-items:center; justify-content:center; gap:5px; overflow:hidden; margin-top:4px; color:#1c5056; font-family:var(--font-display); font-size:13px; text-align:center; white-space:nowrap; }
 .seat-token strong span { overflow:hidden; text-overflow:ellipsis; }
 .seat-token strong .role-icon { width:25px; height:25px; border-color:#ffffffbb; }
 .seat-token.seat-minion strong,.seat-token.seat-demon strong { color:#8e3e35; }
-.seat-token.is-dead { filter:grayscale(.65); background:#ddd9d0; opacity:.73; }
+.seat-token.is-dead { filter:saturate(.42); opacity:.68; }
 .seat-token.is-dead i { color:#8b3b34; }
 .seat-token.is-dead strong { text-decoration:line-through; }
 .seat-editor { display:grid; grid-template-columns:auto minmax(220px,1fr) auto; align-items:end; gap:14px; margin-top:16px; padding:15px; border:1px solid #cfc4b2; background:#fffdf8; }
