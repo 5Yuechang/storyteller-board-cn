@@ -281,6 +281,20 @@ export default function BoardBuilder() {
     setGamePhase(nextPhase); setDayNumber(nextDay); setNightMode(nextPhase === 'firstNight' ? 'first' : 'other'); setCompletedSteps(new Set());
     addLog('system',`进入${phaseName(nextPhase,nextDay)}`,undefined,nextPhase,nextDay);
   }
+  function clearHistory() {
+    if (!gameLog.length || window.confirm(`清空${phaseName(gamePhase,dayNumber)}及之前的全部日志？当前阶段不会改变。`)) setGameLog([]);
+  }
+  function resetCurrentGame() {
+    if (!window.confirm('重置本局？将清空日志、死亡状态、状态标记和夜间进度，但保留当前配板及座位身份。')) return;
+    setSeats((current) => current.map((seat) => ({ ...seat, alive:true, statuses:[] })));
+    setCompletedSteps(new Set());
+    setGameStarted(false);
+    setGamePhase('firstNight');
+    setDayNumber(1);
+    setNightMode('first');
+    setGameLog([]);
+    setManualNote('');
+  }
   function submitManualNote() {
     const text = manualNote.trim();
     if (!text) return;
@@ -307,7 +321,7 @@ export default function BoardBuilder() {
           <button className={view === 'night' ? 'is-active' : ''} onClick={() => setView('night')}><Moon/>唤醒顺序</button>
           <button className={view === 'history' ? 'is-active' : ''} onClick={() => setView('history')}><BookOpen/>对局日志</button>
         </nav>
-        <section className={`phase-bar ${gameStarted ? 'is-running' : ''}`}><div><span className="phase-dot"/><p><small>当前阶段</small><strong>{gameStarted ? phaseName(gamePhase,dayNumber) : '尚未开始记录'}</strong></p></div>{gameStarted ? <Button onClick={advancePhase}>进入下一阶段<ChevronRight/></Button> : <Button onClick={startGame}><Play/>开始记录</Button>}<button className="log-shortcut" onClick={() => setView('history')}><BookOpen/><span>{gameLog.length} 条记录</span></button></section>
+        <section className={`phase-bar ${gameStarted ? 'is-running' : ''}`}><div><span className="phase-dot"/><p><small>当前阶段</small><strong>{gameStarted ? phaseName(gamePhase,dayNumber) : '尚未开始记录'}</strong></p></div>{gameStarted ? <Button onClick={advancePhase}>进入下一阶段<ChevronRight/></Button> : <Button onClick={startGame}><Play/>开始记录</Button>}<button className="log-shortcut" onClick={() => setView('history')}><BookOpen/><span>{gameLog.length} 条记录</span></button><Button className="reset-game-button" variant="outline" onClick={resetCurrentGame}><RotateCcw/>重置本局</Button></section>
 
         {view === 'roles' && <Tabs defaultValue="townsfolk" className="role-tabs">
           <TabsList className="alignment-tabs" aria-label="按阵营浏览角色">{alignments.map((alignment) => <TabsTrigger key={alignment} value={alignment}>{alignmentMeta[alignment].short}<span>{script.roles.filter((role) => role.alignment === alignment).length}</span></TabsTrigger>)}</TabsList>
@@ -334,13 +348,13 @@ export default function BoardBuilder() {
         </section>}
 
         {view === 'history' && <section className="history-workspace">
-          <div className="view-heading"><div><span className="eyebrow">GAME REVIEW</span><h3>对局日志与复盘</h3><p>关键操作自动记录，也可以随时补充说书人备注。</p></div>{gameLog.length > 0 && <Button variant="outline" onClick={() => setGameLog([])}><Trash2/>清空日志</Button>}</div>
+          <div className="view-heading"><div><span className="eyebrow">GAME REVIEW</span><h3>对局日志与复盘</h3><p>关键操作自动记录，也可以随时补充说书人备注。</p></div>{gameLog.length > 0 && <Button variant="outline" onClick={clearHistory}><Trash2/>清空日志</Button>}</div>
           <form className="quick-note" onSubmit={(event) => { event.preventDefault(); submitManualNote(); }}><Input value={manualNote} onChange={(event) => setManualNote(event.target.value)} placeholder="记录提名、处决、能力结果或其他关键事件…" aria-label="对局备注"/><Button type="submit" disabled={!manualNote.trim()}><Plus/>添加记录</Button></form>
           <div className="history-timeline">{gameLog.length ? gameLog.map((entry,index) => {
             const previous = gameLog[index - 1];
             const showPhase = !previous || previous.phase !== entry.phase || previous.dayNumber !== entry.dayNumber;
             return <div key={entry.id}>{showPhase && <h4><span/>{phaseName(entry.phase,entry.dayNumber)}</h4>}<article className={`log-entry log-${entry.kind}`}><span className="log-mark"/><div><strong>{entry.title}</strong>{entry.detail && <p>{entry.detail}</p>}</div><time>{new Date(entry.createdAt).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})}</time><button onClick={() => setGameLog((current) => current.filter((item) => item.id !== entry.id))} aria-label={`删除记录：${entry.title}`}><Trash2/></button></article></div>;
-          }) : <div className="history-empty"><BookOpen/><h4>还没有对局记录</h4><p>点击上方“开始记录”，死亡、状态变化和夜间步骤会自动出现在这里。</p></div>}</div>
+          }) : <div className="history-empty"><BookOpen/><h4>当前没有日志</h4><p>{gameStarted ? `仍处于${phaseName(gamePhase,dayNumber)}；之后的新记录会继续归入这个阶段。` : '点击上方“开始记录”，死亡、状态变化和夜间步骤会自动出现在这里。'}</p></div>}</div>
         </section>}
       </div>
 

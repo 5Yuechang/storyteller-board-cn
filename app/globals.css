@@ -38,7 +38,7 @@ button,select { font:inherit; } button { cursor:pointer; }
 .workspace-nav button svg { width:15px; }
 .workspace-nav button:hover { color:#1e5056; background:#ffffff66; }
 .workspace-nav button.is-active { color:#fffaf0; background:#174e55; box-shadow:0 2px 8px #173e4328; }
-.phase-bar { display:grid; grid-template-columns:minmax(180px,1fr) auto auto; align-items:center; gap:10px; margin:-6px 0 18px; padding:10px 12px; border:1px solid #d3c8b8; background:#f3eee3; }
+.phase-bar { display:grid; grid-template-columns:minmax(180px,1fr) auto auto auto; align-items:center; gap:10px; margin:-6px 0 18px; padding:10px 12px; border:1px solid #d3c8b8; background:#f3eee3; }
 .phase-bar>div { display:flex; align-items:center; gap:9px; }
 .phase-dot { width:10px; height:10px; flex:none; border-radius:50%; background:#9b9589; box-shadow:0 0 0 4px #9b95891c; }
 .phase-bar.is-running .phase-dot { background:#a04439; box-shadow:0 0 0 4px #a0443920; animation:phase-pulse 2s ease-in-out infinite; }
@@ -48,6 +48,7 @@ button,select { font:inherit; } button { cursor:pointer; }
 .phase-bar button { height:32px; font-size:11px; }
 .log-shortcut { display:flex; align-items:center; gap:6px; border:0; padding:0 5px; color:#6e6b63; background:transparent; }
 .log-shortcut svg { width:14px; }
+.reset-game-button { color:#873d35!important; border-color:#c9aaa4!important; background:#f8edeb!important; }
 @keyframes phase-pulse { 50% { box-shadow:0 0 0 7px #a0443908; } }
 .alignment-tabs { width:100%; height:42px!important; justify-content:flex-start; gap:6px; padding:5px; background:#e8e1d3; }
 .alignment-tabs button { flex:0 1 158px; height:32px; }
