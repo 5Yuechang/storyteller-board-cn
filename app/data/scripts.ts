@@ -1,7 +1,7 @@
 export type Alignment = 'townsfolk' | 'outsider' | 'minion' | 'demon';
-export type Role = { id: string; name: string; alignment: Alignment; ability: string; timing?: '首夜' | '每夜' | '白天' | '被动' | '一次'; setup?: string; note?: string };
+export type Role = { id: string; name: string; alignment: Alignment; ability: string; timing?: '首夜' | '每夜' | '每夜*' | '白天' | '被动' | '一次'; setup?: string; note?: string };
 export type PlayerCount = Record<Alignment, number>;
-export type NightStep = { id: string; name: string; note: string; roleId?: string; phase?: '信息'|'行动'|'结算'; deadMode?: 'show'|'only' };
+export type NightStep = { id: string; name: string; note: string; roleId?: string; phase?: '信息'|'行动'|'结算'; deadMode?: 'show'|'only'; requiredAlignment?: Alignment; skipWhenRolePresent?: string };
 export type ScriptDefinition = { id: string; name: string; author: string; playerRange: [number, number]; description: string; counts: Record<number, PlayerCount>; roles: Role[]; nightOrder: { first: NightStep[]; other: NightStep[] } };
 
 const standardCounts: Record<number, PlayerCount> = {
@@ -36,23 +36,24 @@ export const scripts: ScriptDefinition[] = [{
 
     {id:'psychopath',name:'精神病患者',alignment:'minion',timing:'白天',ability:'每个白天，在提名开始前，你可以公开选择一名玩家：他死亡。如果你被处决，提名你的玩家需要和你猜拳，只有你输了你才会死亡。'},
     {id:'boomdandy',name:'炸弹人',alignment:'minion',timing:'被动',ability:'如果你被处决，除三名玩家以外的其他所有玩家均会死亡。倒数十声后，被最多玩家手指指着的玩家死亡。'},
-    {id:'pit-hag',name:'麻脸巫婆',alignment:'minion',timing:'每夜',ability:'每个夜晚，你要选择一名玩家和一个角色：如果该角色不在场，他变成该角色。如果因此创造了一个恶魔，当晚的死亡由说书人决定。'},
+    {id:'pit-hag',name:'麻脸巫婆',alignment:'minion',timing:'每夜*',ability:'每个夜晚*，你要选择一名玩家和一个角色：如果该角色不在场，他变成该角色。如果因此创造了一个恶魔，当晚的死亡由说书人决定。'},
     {id:'spirit-whisperer',name:'灵言师',alignment:'minion',timing:'首夜',ability:'在你的首个夜晚，你会得知一个关键词。首个说出该关键词的善良玩家会在当晚转变为邪恶阵营。'},
-    {id:'organ-grinder',name:'街头风琴手',alignment:'minion',timing:'被动',ability:'所有玩家在投票时闭眼，且票数会秘密统计。每个夜晚，你要选择自己是否醉酒直到下个黄昏。'},
+    {id:'organ-grinder',name:'街头风琴手',alignment:'minion',timing:'每夜',ability:'所有玩家在投票时闭眼，且票数会秘密统计。每个夜晚，你要选择自己是否醉酒直到下个黄昏。'},
     {id:'marionette',name:'提线木偶',alignment:'minion',timing:'被动',ability:'你以为你是一个善良角色，但其实你不是。恶魔会知道你是提线木偶。',setup:'与恶魔邻座'},
 
-    {id:'toy-maker',name:'童趣玩偶',alignment:'demon',timing:'每夜',ability:'每个夜晚*，你可以选择三名玩家（所有玩家都会得知你选了谁）：他们分别在三名玩家中秘密选择一名玩家，被选择最多的玩家死亡。如果只有一名玩家被选择，改为其他两名玩家死亡。'},
-    {id:'trolley-problem',name:'电车难题',alignment:'demon',timing:'每夜',ability:'每个夜晚*，你可以选择三名玩家（所有玩家都会得知前两名玩家是谁）：所有善良玩家分别秘密表决他们的生死，然后如果他们存活则第三名玩家死亡。'},
-    {id:'black-sun',name:'太阳黑子',alignment:'demon',timing:'每夜',ability:'每个夜晚*，你可以选择三名存活玩家（所有玩家都会得知前两名玩家是谁）：第三名玩家秘密决定他们中谁会被你杀死，然后如果他们都死亡，则所有玩家都会在下个黎明得知第三名玩家是谁。'},
-    {id:'hadi-jiya',name:'哈迪寂亚',alignment:'demon',timing:'每夜',ability:'每个夜晚*，你可以选择三名玩家（所有玩家都会得知你选了谁）：他们分别秘密决定自己的生死，然后如果他们都存活则都死亡。'},
+    {id:'toy-maker',name:'童趣玩偶',alignment:'demon',timing:'每夜*',ability:'每个夜晚*，你可以选择三名玩家（所有玩家都会得知你选了谁）：他们分别在三名玩家中秘密选择一名玩家，被选择最多的玩家死亡。如果只有一名玩家被选择，改为其他两名玩家死亡。'},
+    {id:'trolley-problem',name:'电车难题',alignment:'demon',timing:'每夜*',ability:'每个夜晚*，你可以选择三名玩家（所有玩家都会得知前两名玩家是谁）：所有善良玩家分别秘密表决他们的生死，然后如果他们存活则第三名玩家死亡。'},
+    {id:'black-sun',name:'太阳黑子',alignment:'demon',timing:'每夜*',ability:'每个夜晚*，你可以选择三名存活玩家（所有玩家都会得知前两名玩家是谁）：第三名玩家秘密决定他们中谁会被你杀死，然后如果他们都死亡，则所有玩家都会在下个黎明得知第三名玩家是谁。'},
+    {id:'hadi-jiya',name:'哈迪寂亚',alignment:'demon',timing:'每夜*',ability:'每个夜晚*，你可以选择三名玩家（所有玩家都会得知你选了谁）：他们分别秘密决定自己的生死，然后如果他们都存活则都死亡。'},
   ],
   nightOrder:{
     first:[
-      {id:'minion-info',name:'爪牙信息',note:'唤醒爪牙，互认并确认恶魔；罂粟种植者在场时跳过。',phase:'信息'},
-      {id:'demon-info',name:'恶魔信息',note:'确认爪牙与三项伪装；罂粟种植者在场时跳过互认部分。',phase:'信息'},
+      {id:'minion-info',name:'爪牙信息',note:'唤醒爪牙，让其互认并确认恶魔。',phase:'信息',requiredAlignment:'minion',skipWhenRolePresent:'poppy-grower'},
+      {id:'demon-info',name:'恶魔信息',note:'确认爪牙与三项不在场的善良角色。',phase:'信息',requiredAlignment:'demon'},
       {id:'poppy-block',name:'罂粟种植者',note:'确认邪恶阵营本夜不互相认识。',roleId:'poppy-grower',phase:'结算'},
       {id:'spirit-whisperer-first',name:'灵言师',note:'告知一个关键词。',roleId:'spirit-whisperer',phase:'信息'},
       {id:'marionette-first',name:'提线木偶',note:'让恶魔确认提线木偶；不要唤醒提线木偶本人。',roleId:'marionette',phase:'信息'},
+      {id:'organ-grinder-first',name:'街头风琴手',note:'选择自己是否醉酒，持续到下个黄昏。',roleId:'organ-grinder',phase:'行动'},
       {id:'lunatic-first',name:'疯子',note:'按恶魔流程唤醒并让其选择目标，记录选择。',roleId:'lunatic',phase:'行动'},
       {id:'preacher-first',name:'传教士',note:'选择一名玩家；若为爪牙，处理失去能力。',roleId:'preacher',phase:'行动'},
       {id:'snake-charmer-first',name:'舞蛇人',note:'选择一名存活玩家，检查是否与恶魔交换。',roleId:'snake-charmer',phase:'行动'},
@@ -61,12 +62,12 @@ export const scripts: ScriptDefinition[] = [{
       {id:'noble-first',name:'贵族',note:'展示三名玩家，其中恰有一名邪恶。',roleId:'noble',phase:'信息'},
       {id:'innkeeper-first',name:'店小二',note:'展示两名善良玩家，并处理其中一人醉酒；死亡后仍会获得信息。',roleId:'innkeeper',phase:'信息',deadMode:'show'},
       {id:'balloonist-first',name:'气球驾驶员',note:'展示第一名玩家，记录其角色类型。',roleId:'balloonist',phase:'信息'},
-      {id:'amnesiac-first',name:'失忆者',note:'按本局自定义能力执行。',roleId:'amnesiac',phase:'行动'},
     ],
     other:[
       {id:'poppy-death',name:'罂粟种植者',note:'其死亡后，安排邪恶阵营在本夜互相认识。',roleId:'poppy-grower',phase:'结算',deadMode:'only'},
       {id:'preacher-other',name:'传教士',note:'选择一名玩家；若为爪牙，处理失去能力。',roleId:'preacher',phase:'行动'},
       {id:'snake-charmer-other',name:'舞蛇人',note:'选择一名存活玩家，检查是否与恶魔交换。',roleId:'snake-charmer',phase:'行动'},
+      {id:'huntsman-other',name:'巡山人',note:'若尚未发动，可选择一名存活玩家并检查落难少女。',roleId:'huntsman',phase:'行动'},
       {id:'professor-other',name:'教授',note:'若发动能力，选择一名死亡玩家并检查是否复活。',roleId:'professor',phase:'行动'},
       {id:'pit-hag-other',name:'麻脸巫婆',note:'选择玩家与角色，处理角色变化及恶魔被创造的死亡。',roleId:'pit-hag',phase:'行动'},
       {id:'organ-grinder-other',name:'街头风琴手',note:'选择自己是否醉酒直到下个黄昏。',roleId:'organ-grinder',phase:'行动'},
@@ -78,7 +79,6 @@ export const scripts: ScriptDefinition[] = [{
       {id:'fortune-teller-other',name:'占卜师',note:'选择两名玩家，给出是否包含恶魔的信息。',roleId:'fortune-teller',phase:'信息'},
       {id:'balloonist-other',name:'气球驾驶员',note:'展示一名与上次角色类型不同的玩家。',roleId:'balloonist',phase:'信息'},
       {id:'banshee-other',name:'秉笔',note:'本日或本夜死亡后，按死亡时段展示对应阵营玩家。',roleId:'banshee',phase:'信息',deadMode:'only'},
-      {id:'amnesiac-other',name:'失忆者',note:'按本局自定义能力执行。',roleId:'amnesiac',phase:'行动'},
     ]
   }
 }];

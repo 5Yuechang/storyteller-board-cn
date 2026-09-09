@@ -87,10 +87,15 @@ function SeatMap({ seats, roles, activeSeat, onSelect }: { seats: Seat[]; roles:
 
 function NightList({ title, steps, selected, seats, roles, completed, onToggle }: { title: string; steps: NightStep[]; selected: Set<string>; seats: Seat[]; roles: Role[]; completed: Set<string>; onToggle: (id: string) => void }) {
   const visible = steps.filter((step) => {
+    if (step.requiredAlignment && !roles.some((role) => role.alignment === step.requiredAlignment && selected.has(role.id))) return false;
+    if (step.skipWhenRolePresent && selected.has(step.skipWhenRolePresent)) return false;
     if (!step.roleId) return true;
     if (!selected.has(step.roleId)) return false;
     const assignedSeat = seats.find((seat) => seat.roleId === step.roleId);
     if (!assignedSeat) return step.deadMode !== 'only';
+    const assignedRole = roles.find((role) => role.id === step.roleId);
+    if (assignedSeat.statuses.includes('noAbility')) return false;
+    if (assignedSeat.statuses.includes('abilityUsed') && assignedRole?.timing === '一次') return false;
     if (step.deadMode === 'show') return true;
     if (step.deadMode === 'only') return !assignedSeat.alive;
     return assignedSeat.alive;
@@ -100,12 +105,12 @@ function NightList({ title, steps, selected, seats, roles, completed, onToggle }
     <ol>{visible.map((step, index) => {
       const assignedSeat = step.roleId ? seats.find((seat) => seat.roleId === step.roleId) : undefined;
       const assignedRole = step.roleId ? roles.find((role) => role.id === step.roleId) : undefined;
-      const skipped = selected.has('poppy-grower') && (step.id === 'minion-info' || step.id === 'demon-info');
-      return <li key={step.id} className={`${completed.has(step.id) ? 'is-complete' : ''} ${skipped ? 'is-skipped' : ''}`}>
+      const poppyDemonInfo = selected.has('poppy-grower') && step.id === 'demon-info';
+      return <li key={step.id} className={completed.has(step.id) ? 'is-complete' : ''}>
         <span className="night-index">{String(index + 1).padStart(2, '0')}</span>
         <Checkbox checked={completed.has(step.id)} onCheckedChange={() => onToggle(step.id)} aria-label={`完成${step.name}`}/>
         {assignedRole ? <RoleIcon role={assignedRole} className="night-role-icon"/> : <span className="night-role-icon system-icon"><Moon/></span>}
-        <button onClick={() => onToggle(step.id)}><strong>{step.name}</strong><small>{skipped ? '罂粟种植者在场，本项跳过' : step.note}</small></button>
+        <button onClick={() => onToggle(step.id)}><strong>{step.name}</strong><small>{poppyDemonInfo ? '罂粟种植者在场：只展示三项伪装，不告知爪牙。' : step.note}</small></button>
         <span className={`phase phase-${step.phase}`}>{step.phase}</span>
         {assignedRole && <span className={`night-seat night-seat-${assignedRole.alignment}`}>{assignedSeat ? `${assignedSeat.number}号${assignedSeat.alive ? '' : ' · 已死亡'}` : '未入座'}</span>}
       </li>;
@@ -322,6 +327,7 @@ export default function BoardBuilder() {
 
         {view === 'night' && <section className="night-workspace">
           <div className="view-heading"><div><span className="eyebrow">NIGHT PHASE</span><h3>夜间唤醒顺序</h3><p>只显示当前配板相关步骤；完成后勾选，座位号会自动关联。</p></div><Button variant="outline" onClick={() => setCompletedSteps(new Set())}><RotateCcw/>重置进度</Button></div>
+          <div className="night-rule-banner"><Moon/><div><strong>夜序已按主动能力过滤</strong><span>“每夜”包含首夜；“每夜*”从第二夜开始。死亡、失去能力及已使用的一次性角色会按规则自动跳过。</span></div></div>
           <div className="night-toggle"><button className={nightMode === 'first' ? 'is-active' : ''} onClick={() => setNightMode('first')}><Moon/>首个夜晚</button><button className={nightMode === 'other' ? 'is-active' : ''} onClick={() => setNightMode('other')}><Sunrise/>其他夜晚</button></div>
           <NightList title={nightMode === 'first' ? '首个夜晚' : '其他夜晚'} steps={script.nightOrder[nightMode]} selected={selected} seats={seats} roles={script.roles} completed={completedSteps} onToggle={toggleNightStep}/>
           <p className="night-footnote">提示：中毒、醉酒、角色变化及自定义能力可能改变实际处理方式，说书人应结合当前场况判断。</p>

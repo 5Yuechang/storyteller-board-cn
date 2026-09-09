@@ -167,6 +167,11 @@ button,select { font:inherit; } button { cursor:pointer; }
 .seat-status-editor button.status-turnedEvil.is-active { border-color:#87372f; background:#9a4137; }
 
 .night-toggle { display:flex; gap:6px; width:max-content; margin-bottom:12px; padding:4px; border-radius:8px; background:#e5ded0; }
+.night-rule-banner { display:flex; align-items:flex-start; gap:9px; margin-bottom:11px; padding:10px 12px; border:1px solid #c9b98e; color:#68572f; background:#f5edd8; }
+.night-rule-banner>svg { width:18px; flex:none; margin-top:1px; }
+.night-rule-banner>div { display:flex; flex-direction:column; gap:2px; }
+.night-rule-banner strong { font-size:11px; }
+.night-rule-banner span { font-size:10px; line-height:1.5; }
 .night-toggle button { display:flex; align-items:center; gap:6px; height:32px; padding:0 14px; border:0; border-radius:6px; color:#62665f; background:transparent; font-size:12px; font-weight:700; }
 .night-toggle button svg { width:14px; }
 .night-toggle button.is-active { color:#f7f1e6; background:#173f45; }
