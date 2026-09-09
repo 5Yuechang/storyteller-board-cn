@@ -89,6 +89,22 @@ button,select { font:inherit; } button { cursor:pointer; }
 .evil-win-status>b small { font-family:var(--font-ui); font-weight:600; }
 .evil-win-status.is-at-line { border-color:#9b4b40; color:#fff7ef; background:#8e3c33; }
 .evil-win-status.is-good-win { border-color:#7ea08d; color:#f7fff9; background:#3d7359; }
+.demon-bluffs { margin:0 0 12px; padding:11px; border:1px solid #c9b79b; background:#eee7d8; }
+.bluff-heading,.bluff-heading>div { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.bluff-heading>div>svg { width:19px; color:#8d4339; }
+.bluff-heading span { display:flex; flex-direction:column; gap:1px; }
+.bluff-heading b { color:#704038; font-size:12px; }
+.bluff-heading small { color:#898073; font-size:9px; }
+.bluff-heading button { display:flex; align-items:center; gap:4px; border:0; color:#745329; background:transparent; font-size:10px; font-weight:800; }
+.bluff-heading button svg { width:13px; }
+.bluff-heading button:disabled { opacity:.4; }
+.bluff-slots { display:grid; gap:6px; margin-top:9px; }
+.bluff-slot { display:grid; grid-template-columns:31px minmax(0,1fr); align-items:center; gap:7px; }
+.bluff-slot>span { width:31px; height:31px; display:grid; place-items:center; border:1px solid #c8b89e; border-radius:50%; color:#917039; background:#faf6ed; font-family:var(--font-display); }
+.bluff-slot .role-icon { width:31px; height:31px; }
+.bluff-slot [data-slot="native-select-wrapper"] { width:100%; }
+.bluff-slot [data-slot="native-select"] { height:32px; background:#fffdf8; font-size:11px; }
+.bluff-empty { margin:9px 0 0; color:#8d8477; font-size:10px; line-height:1.45; }
 .selected-groups { display:grid; gap:7px; }
 .selected-group { border:1px solid #d9d0c2; background:#fffdf8; padding:9px 10px; }
 .selected-group>div { display:flex; justify-content:space-between; font-size:12px; font-weight:700; }
@@ -203,6 +219,28 @@ button,select { font:inherit; } button { cursor:pointer; }
 .night-seat-minion,.night-seat-demon { color:#8a3d34; background:#f1dfdb; }
 .night-footnote { margin:11px 2px 0; color:#89867c; font-size:10px; line-height:1.55; }
 
+.advice-rule-banner { display:flex; align-items:flex-start; gap:10px; padding:13px 14px; border:1px solid #c4a6b4; color:#60465d; background:#f0e5eb; }
+.advice-rule-banner>svg { width:20px; flex:none; margin-top:1px; }
+.advice-rule-banner>div { display:flex; flex-direction:column; gap:3px; }
+.advice-rule-banner strong { font-size:12px; }
+.advice-rule-banner span { font-size:10px; line-height:1.55; }
+.advice-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-top:13px; }
+.advice-card { border:1px solid #d5cbbc; background:#fffdf8; padding:13px; }
+.advice-card.is-active { border-color:#805b8d; background:#f6eff8; box-shadow:inset 3px 0 0 #765286; }
+.advice-card header { display:flex; align-items:center; gap:9px; }
+.advice-card header>div { display:flex; flex-direction:column; min-width:0; }
+.advice-card h4 { margin:0; color:#234e53; font-family:var(--font-display); font-size:17px; }
+.advice-card header span { margin-top:2px; color:#888176; font-size:9px; }
+.advice-card header>b { margin-left:auto; padding:3px 6px; border-radius:4px; color:#fff; background:#765286; font-size:9px; white-space:nowrap; }
+.advice-card>p { margin:10px 0; padding-bottom:9px; border-bottom:1px solid #e3dbcf; color:#6e6b64; font-size:10px; line-height:1.55; }
+.advice-card ul { display:grid; gap:6px; margin:0; padding:0; list-style:none; }
+.advice-card li { display:grid; grid-template-columns:15px minmax(0,1fr); gap:6px; color:#4e5654; font-size:11px; line-height:1.45; }
+.advice-card li svg { width:13px; margin-top:1px; color:#ae8438; }
+.advice-empty { grid-column:1/-1; display:grid; place-items:center; min-height:260px; padding:35px; color:#989187; text-align:center; }
+.advice-empty>svg { width:34px; height:34px; color:#b99b62; }
+.advice-empty h4 { margin:12px 0 4px; color:#4c6667; font-family:var(--font-display); }
+.advice-empty p { max-width:440px; margin:0; font-size:11px; line-height:1.6; }
+
 .quick-note { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; padding:12px; border:1px solid #d3c8b8; background:#eee8dc; }
 .quick-note [data-slot="input"] { height:36px; background:#fffdf7; }
 .quick-note button { height:36px; }
@@ -227,5 +265,5 @@ button,select { font:inherit; } button { cursor:pointer; }
 .history-empty h4 { display:block; margin:12px 0 4px; color:#4c6667; font-family:var(--font-display); }
 .history-empty p { max-width:420px; margin:0; font-size:11px; line-height:1.6; }
 
-@media(max-width:1050px){.workspace{grid-template-columns:1fr 310px;padding:18px}.role-grid{grid-template-columns:1fr}.seat-ring{width:min(590px,96%)}.seat-token{width:88px}.seat-editor{grid-template-columns:1fr 1fr}.seat-editor-number{grid-column:1/-1}}
+@media(max-width:1050px){.workspace{grid-template-columns:1fr 310px;padding:18px}.role-grid,.advice-grid{grid-template-columns:1fr}.seat-ring{width:min(590px,96%)}.seat-token{width:88px}.seat-editor{grid-template-columns:1fr 1fr}.seat-editor-number{grid-column:1/-1}}
 @media(max-width:760px){.topbar{height:auto;min-height:78px;padding:12px 16px;flex-wrap:wrap}.brand-copy{flex:1}.header-controls{width:100%;margin:0}.header-controls label{flex:1}.header-controls label>span{display:none}.header-controls [data-slot="native-select-wrapper"]{width:100%}.workspace{display:block;padding:12px}.catalog-panel{padding:16px}.script-heading{display:block}.author{display:inline-block;margin-top:12px}.workspace-nav{overflow-x:auto}.workspace-nav button{min-width:108px}.phase-bar{grid-template-columns:1fr auto}.log-shortcut{grid-column:1/-1}.section-title p{display:none}.alignment-tabs{overflow-x:auto;justify-content:flex-start}.alignment-tabs button{min-width:92px}.board-panel{position:static;max-height:none;margin-top:12px}.view-heading{display:block}.view-heading>div:last-child{margin-top:12px}.seat-ring{width:520px;margin-left:50%;transform:translateX(-50%) scale(.72);margin-top:-65px;margin-bottom:-65px}.seat-editor{grid-template-columns:1fr}.seat-editor-number{grid-column:auto}.night-list li{grid-template-columns:25px 18px 32px minmax(0,1fr) auto}.night-role-icon{width:30px;height:30px}.night-seat{grid-column:4}.phase{grid-column:5;grid-row:1}.night-list li small{font-size:9px}.quick-note{grid-template-columns:1fr}.log-entry{grid-template-columns:12px minmax(0,1fr) 24px}.log-entry time{display:none}.role-card>p,.role-foot{margin-left:0}}

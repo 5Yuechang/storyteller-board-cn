@@ -1,5 +1,5 @@
 export type Alignment = 'townsfolk' | 'outsider' | 'minion' | 'demon';
-export type Role = { id: string; name: string; alignment: Alignment; ability: string; timing?: '首夜' | '每夜' | '每夜*' | '白天' | '被动' | '一次'; setup?: string; note?: string };
+export type Role = { id: string; name: string; alignment: Alignment; ability: string; timing?: '首夜' | '每夜' | '每夜*' | '白天' | '被动' | '一次'; setup?: string; note?: string; misinformation?: string[] };
 export type PlayerCount = Record<Alignment, number>;
 export type NightStep = { id: string; name: string; note: string; roleId?: string; phase?: '信息'|'行动'|'结算'; deadMode?: 'show'|'only'; requiredAlignment?: Alignment; skipWhenRolePresent?: string };
 export type ScriptDefinition = { id: string; name: string; author: string; playerRange: [number, number]; description: string; counts: Record<number, PlayerCount>; roles: Role[]; nightOrder: { first: NightStep[]; other: NightStep[] } };
@@ -14,18 +14,18 @@ export const scripts: ScriptDefinition[] = [{
   id:'human-nature-is-evil', name:'人性本恶', author:'芝士薯条', playerRange:[7,15],
   description:'围绕隐藏阵营、能力错位与公开博弈展开的进阶剧本。', counts:standardCounts,
   roles:[
-    {id:'noble',name:'贵族',alignment:'townsfolk',timing:'首夜',ability:'在你的首个夜晚，你会得知三名玩家：其中有且只有一名玩家是邪恶的。'},
-    {id:'innkeeper',name:'店小二',alignment:'townsfolk',timing:'首夜',ability:'在你的首个夜晚，你会得知两名善良玩家。他们之中会有一人醉酒，即使你已死亡。'},
-    {id:'fortune-teller',name:'占卜师',alignment:'townsfolk',timing:'每夜',ability:'每个夜晚，你要选择两名玩家：你会得知他们之中是否有恶魔。会有一名善良玩家始终被你的能力当作“恶魔”。'},
+    {id:'noble',name:'贵族',alignment:'townsfolk',timing:'首夜',ability:'在你的首个夜晚，你会得知三名玩家：其中有且只有一名玩家是邪恶的。',misinformation:['展示三名善良玩家，让其中一名行为可疑的玩家成为焦点。','展示两名邪恶玩家与一名善良玩家，制造互斥的邪恶世界。','把一名外来者放进三人组，让其角色诉求自然放大怀疑。']},
+    {id:'innkeeper',name:'店小二',alignment:'townsfolk',timing:'首夜',ability:'在你的首个夜晚，你会得知两名善良玩家。他们之中会有一人醉酒，即使你已死亡。',misinformation:['展示一善一恶两名玩家，让邪恶玩家获得被认证空间。','展示两名善良玩家，但把玩家对醉酒落点的判断引向错误对象。','选择身份尚未公开的玩家，延后错误信息被立即验证。']},
+    {id:'fortune-teller',name:'占卜师',alignment:'townsfolk',timing:'每夜',ability:'每个夜晚，你要选择两名玩家：你会得知他们之中是否有恶魔。会有一名善良玩家始终被你的能力当作“恶魔”。',misinformation:['在不含恶魔、也不含红鲱鱼的组合上给出“是”。','在包含恶魔的组合上给出“否”，为恶魔制造一次可信认证。','让连续两晚的答案形成一致但错误的世界，而不是随机翻转。']},
     {id:'snake-charmer',name:'舞蛇人',alignment:'townsfolk',timing:'每夜',ability:'每个夜晚，你要选择一名存活的玩家：如果你选中了恶魔，你和他交换角色和阵营，随后他中毒。'},
     {id:'preacher',name:'传教士',alignment:'townsfolk',timing:'每夜',ability:'每个夜晚，你要选择一名玩家：如果你选中了爪牙，他会得知被传教士选中。所有被你选中的爪牙失去能力。'},
-    {id:'balloonist',name:'气球驾驶员',alignment:'townsfolk',timing:'每夜',ability:'每个夜晚，你会得知一名与上个夜晚得知的玩家角色类型不同的玩家。',setup:'+0～1 外来者'},
+    {id:'balloonist',name:'气球驾驶员',alignment:'townsfolk',timing:'每夜',ability:'每个夜晚，你会得知一名与上个夜晚得知的玩家角色类型不同的玩家。',setup:'+0～1 外来者',misinformation:['连续展示相同角色类型的玩家，让类型链在复盘时出现缺口。','跳过一种角色类型，诱导玩家错误排除某个阵营。','先给可信玩家，再把邪恶玩家接入看似合法的类型链。']},
     {id:'huntsman',name:'巡山人',alignment:'townsfolk',timing:'一次',ability:'每局游戏限一次，在夜晚时，你可以选择一名存活的玩家：如果你选中了落难少女，她会变成一个不在场的镇民角色。',setup:'+ 落难少女'},
     {id:'professor',name:'教授',alignment:'townsfolk',timing:'一次',ability:'每局游戏限一次，在夜晚时，你可以选择一名死亡的玩家：如果他是镇民，他会被复活。'},
-    {id:'savant',name:'博学者',alignment:'townsfolk',timing:'白天',ability:'每个白天，你可以私下询问说书人以得知两条信息：一个是正确的，一个是错误的。'},
-    {id:'amnesiac',name:'失忆者',alignment:'townsfolk',timing:'白天',ability:'你不知道你的能力是什么。每个白天你可以找说书人猜测一次，并得知猜测有多准确。'},
+    {id:'savant',name:'博学者',alignment:'townsfolk',timing:'白天',ability:'每个白天，你可以私下询问说书人以得知两条信息：一个是正确的，一个是错误的。',misinformation:['给出两条都为真但看似互相冲突的信息，制造能力异常感。','给出两条都为假、却共同支持一个错误世界的信息。','把一条信息绑定到已死亡玩家或过去事件，降低即时可验证性。']},
+    {id:'amnesiac',name:'失忆者',alignment:'townsfolk',timing:'白天',ability:'你不知道你的能力是什么。每个白天你可以找说书人猜测一次，并得知猜测有多准确。',misinformation:['对接近答案的猜测给出偏低反馈，引导玩家多探索一个分支。','对错误但有趣的猜测给出偏高反馈，制造可持续验证的假方向。','保持反馈尺度一致，避免单次异常直接暴露醉酒或中毒。']},
     {id:'poppy-grower',name:'罂粟种植者',alignment:'townsfolk',timing:'被动',ability:'爪牙和恶魔互不认识。如果你死亡，当晚他们会互相认识。'},
-    {id:'banshee',name:'秉笔',alignment:'townsfolk',timing:'被动',ability:'如果你在白天死亡，当晚你会得知一名善良玩家；如果你在夜晚死亡，当晚你会得知一名邪恶玩家。',note:'名称与能力按上传剧本图录入'},
+    {id:'banshee',name:'秉笔',alignment:'townsfolk',timing:'被动',ability:'如果你在白天死亡，当晚你会得知一名善良玩家；如果你在夜晚死亡，当晚你会得知一名邪恶玩家。',note:'名称与能力按上传剧本图录入',misinformation:['白天死亡时展示一名邪恶玩家，反转其善良认证。','夜晚死亡时展示一名善良玩家，把怀疑推向错误目标。','优先选择尚未公开身份的玩家，让错误信息保留讨论空间。']},
     {id:'redirector',name:'半仙',alignment:'townsfolk',timing:'被动',ability:'每个在夜晚使用自身能力选择你的其他玩家，会改为选中另一名邪恶玩家作为替代。',note:'自制角色'},
     {id:'atheist',name:'无神论者',alignment:'townsfolk',timing:'被动',ability:'说书人可以打破游戏规则。如果说书人被处决，善良阵营获胜，即使你已死亡。',setup:'无邪恶角色在场'},
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, BookOpen, Check, ChevronRight, CircleHelp, Dice5, LayoutGrid, Lock, Moon, Play, Plus, RotateCcw, ShieldCheck, Shuffle, Skull, Sparkles, Sunrise, Trash2, UserRound, Users } from 'lucide-react';
+import { AlertTriangle, BookOpen, Check, ChevronRight, CircleHelp, Dice5, EyeOff, LayoutGrid, Lightbulb, Lock, Moon, Play, Plus, RotateCcw, ShieldCheck, Shuffle, Skull, Sparkles, Sunrise, Trash2, UserRound, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { alignmentMeta, scripts, type Alignment, type NightStep, type Role } from '@/app/data/scripts';
 
 const alignments: Alignment[] = ['townsfolk', 'outsider', 'minion', 'demon'];
-type ViewMode = 'roles' | 'seats' | 'night' | 'history';
+type ViewMode = 'roles' | 'seats' | 'night' | 'advice' | 'history';
 type GamePhase = 'firstNight'|'day'|'night';
 type LogKind = 'system'|'death'|'status'|'role'|'night'|'note';
 type LogEntry = { id:string; dayNumber:number; phase:GamePhase; kind:LogKind; title:string; detail?:string; createdAt:number };
@@ -85,7 +85,7 @@ function SeatMap({ seats, roles, activeSeat, onSelect }: { seats: Seat[]; roles:
   </div>;
 }
 
-function NightList({ title, steps, selected, seats, roles, completed, onToggle }: { title: string; steps: NightStep[]; selected: Set<string>; seats: Seat[]; roles: Role[]; completed: Set<string>; onToggle: (id: string) => void }) {
+function NightList({ title, steps, selected, seats, roles, bluffs, completed, onToggle }: { title: string; steps: NightStep[]; selected: Set<string>; seats: Seat[]; roles: Role[]; bluffs: (string|null)[]; completed: Set<string>; onToggle: (id: string) => void }) {
   const visible = steps.filter((step) => {
     if (step.requiredAlignment && !roles.some((role) => role.alignment === step.requiredAlignment && selected.has(role.id))) return false;
     if (step.skipWhenRolePresent && selected.has(step.skipWhenRolePresent)) return false;
@@ -106,11 +106,13 @@ function NightList({ title, steps, selected, seats, roles, completed, onToggle }
       const assignedSeat = step.roleId ? seats.find((seat) => seat.roleId === step.roleId) : undefined;
       const assignedRole = step.roleId ? roles.find((role) => role.id === step.roleId) : undefined;
       const poppyDemonInfo = selected.has('poppy-grower') && step.id === 'demon-info';
+      const bluffNames = step.id === 'demon-info' ? bluffs.map((id) => roles.find((role) => role.id === id)?.name).filter(Boolean) : [];
+      const demonInfo = step.id === 'demon-info' && bluffNames.length ? `${poppyDemonInfo ? '罂粟种植者在场：不告知爪牙。' : step.note} 伪装：${bluffNames.join('、')}。` : poppyDemonInfo ? '罂粟种植者在场：只展示三项伪装，不告知爪牙。' : step.note;
       return <li key={step.id} className={completed.has(step.id) ? 'is-complete' : ''}>
         <span className="night-index">{String(index + 1).padStart(2, '0')}</span>
         <Checkbox checked={completed.has(step.id)} onCheckedChange={() => onToggle(step.id)} aria-label={`完成${step.name}`}/>
         {assignedRole ? <RoleIcon role={assignedRole} className="night-role-icon"/> : <span className="night-role-icon system-icon"><Moon/></span>}
-        <button onClick={() => onToggle(step.id)}><strong>{step.name}</strong><small>{poppyDemonInfo ? '罂粟种植者在场：只展示三项伪装，不告知爪牙。' : step.note}</small></button>
+        <button onClick={() => onToggle(step.id)}><strong>{step.name}</strong><small>{demonInfo}</small></button>
         <span className={`phase phase-${step.phase}`}>{step.phase}</span>
         {assignedRole && <span className={`night-seat night-seat-${assignedRole.alignment}`}>{assignedSeat ? `${assignedSeat.number}号${assignedSeat.alive ? '' : ' · 已死亡'}` : '未入座'}</span>}
       </li>;
@@ -133,12 +135,15 @@ export default function BoardBuilder() {
   const [dayNumber, setDayNumber] = useState(1);
   const [gameLog, setGameLog] = useState<LogEntry[]>([]);
   const [manualNote, setManualNote] = useState('');
+  const [demonBluffs, setDemonBluffs] = useState<(string|null)[]>([null,null,null]);
   const [historyReady, setHistoryReady] = useState(false);
   const script = scripts.find((item) => item.id === scriptId) ?? scripts[0];
   const baseQuota = script.counts[playerCount];
   const balloonistSetupActive = selected.has('balloonist');
   const quota = useMemo(() => withBalloonistSetup(baseQuota, balloonistSetupActive), [baseQuota, balloonistSetupActive]);
   const selectedRoles = script.roles.filter((role) => selected.has(role.id));
+  const availableBluffs = script.roles.filter((role) => (role.alignment === 'townsfolk' || role.alignment === 'outsider') && !selected.has(role.id));
+  const adviceRoles = selectedRoles.filter((role) => role.misinformation?.length);
   const activeSeatState = seats.find((seat) => seat.number === activeSeat) ?? seats[0];
   const totals = useMemo(() => Object.fromEntries(alignments.map((alignment) => [alignment, selectedRoles.filter((role) => role.alignment === alignment).length])) as Record<Alignment, number>, [selectedRoles]);
   const aliveCount = seats.filter((seat) => seat.alive).length;
@@ -164,6 +169,10 @@ export default function BoardBuilder() {
     }, 250);
     return () => window.clearTimeout(timer);
   }, [dayNumber, gameLog, gamePhase, gameStarted, historyReady, scriptId]);
+
+  useEffect(() => {
+    setDemonBluffs((current) => current.map((id) => id && selected.has(id) ? null : id));
+  }, [selected]);
 
   const messages = useMemo(() => {
     const result: { type: 'ok'|'warn'|'info'; text: string }[] = [];
@@ -213,7 +222,8 @@ export default function BoardBuilder() {
     addToAlignment('outsider', targetQuota.outsider);
     addToAlignment('minion', targetQuota.minion);
     addToAlignment('demon', targetQuota.demon);
-    setSelected(next); setSeats(makeSeats(playerCount)); setCompletedSteps(new Set());
+    const bluffPool = script.roles.filter((role) => (role.alignment === 'townsfolk' || role.alignment === 'outsider') && !next.has(role.id));
+    setSelected(next); setDemonBluffs(shuffled(bluffPool).slice(0,3).map((role) => role.id)); setSeats(makeSeats(playerCount)); setCompletedSteps(new Set());
   }
   function changePlayerCount(count: number) {
     setPlayerCount(count);
@@ -222,7 +232,13 @@ export default function BoardBuilder() {
     setCompletedSteps(new Set());
   }
   function changeScript(id: string) {
-    setScriptId(id); setSelected(new Set()); setLocked(new Set()); setSeats(makeSeats(playerCount)); setActiveSeat(1); setCompletedSteps(new Set()); setGameStarted(false); setGamePhase('firstNight'); setDayNumber(1); setGameLog([]); setView('roles');
+    setScriptId(id); setSelected(new Set()); setLocked(new Set()); setDemonBluffs([null,null,null]); setSeats(makeSeats(playerCount)); setActiveSeat(1); setCompletedSteps(new Set()); setGameStarted(false); setGamePhase('firstNight'); setDayNumber(1); setGameLog([]); setView('roles');
+  }
+  function randomizeBluffs() {
+    setDemonBluffs(shuffled(availableBluffs).slice(0,3).map((role) => role.id));
+  }
+  function setBluff(index: number, roleId: string | null) {
+    setDemonBluffs((current) => current.map((id, currentIndex) => currentIndex === index ? roleId : id === roleId ? null : id));
   }
   function assignRole(seatNumber: number, roleId: string | null) {
     const currentSeat = seats.find((seat) => seat.number === seatNumber);
@@ -319,6 +335,7 @@ export default function BoardBuilder() {
           <button className={view === 'roles' ? 'is-active' : ''} onClick={() => setView('roles')}><LayoutGrid/>角色配板</button>
           <button className={view === 'seats' ? 'is-active' : ''} onClick={() => setView('seats')}><Users/>环形座位</button>
           <button className={view === 'night' ? 'is-active' : ''} onClick={() => setView('night')}><Moon/>唤醒顺序</button>
+          <button className={view === 'advice' ? 'is-active' : ''} onClick={() => setView('advice')}><Lightbulb/>错误信息</button>
           <button className={view === 'history' ? 'is-active' : ''} onClick={() => setView('history')}><BookOpen/>对局日志</button>
         </nav>
         <section className={`phase-bar ${gameStarted ? 'is-running' : ''}`}><div><span className="phase-dot"/><p><small>当前阶段</small><strong>{gameStarted ? phaseName(gamePhase,dayNumber) : '尚未开始记录'}</strong></p></div>{gameStarted ? <Button onClick={advancePhase}>进入下一阶段<ChevronRight/></Button> : <Button onClick={startGame}><Play/>开始记录</Button>}<button className="log-shortcut" onClick={() => setView('history')}><BookOpen/><span>{gameLog.length} 条记录</span></button><Button className="reset-game-button" variant="outline" onClick={resetCurrentGame}><RotateCcw/>重置本局</Button></section>
@@ -343,8 +360,22 @@ export default function BoardBuilder() {
           <div className="view-heading"><div><span className="eyebrow">NIGHT PHASE</span><h3>夜间唤醒顺序</h3><p>只显示当前配板相关步骤；完成后勾选，座位号会自动关联。</p></div><Button variant="outline" onClick={() => setCompletedSteps(new Set())}><RotateCcw/>重置进度</Button></div>
           <div className="night-rule-banner"><Moon/><div><strong>夜序已按主动能力过滤</strong><span>“每夜”包含首夜；“每夜*”从第二夜开始。死亡、失去能力及已使用的一次性角色会按规则自动跳过。</span></div></div>
           <div className="night-toggle"><button className={nightMode === 'first' ? 'is-active' : ''} onClick={() => setNightMode('first')}><Moon/>首个夜晚</button><button className={nightMode === 'other' ? 'is-active' : ''} onClick={() => setNightMode('other')}><Sunrise/>其他夜晚</button></div>
-          <NightList title={nightMode === 'first' ? '首个夜晚' : '其他夜晚'} steps={script.nightOrder[nightMode]} selected={selected} seats={seats} roles={script.roles} completed={completedSteps} onToggle={toggleNightStep}/>
+          <NightList title={nightMode === 'first' ? '首个夜晚' : '其他夜晚'} steps={script.nightOrder[nightMode]} selected={selected} seats={seats} roles={script.roles} bluffs={demonBluffs} completed={completedSteps} onToggle={toggleNightStep}/>
           <p className="night-footnote">提示：中毒、醉酒、角色变化及自定义能力可能改变实际处理方式，说书人应结合当前场况判断。</p>
+        </section>}
+
+        {view === 'advice' && <section className="advice-workspace">
+          <div className="view-heading"><div><span className="eyebrow">MISINFORMATION DESK</span><h3>错误信息建议</h3><p>根据本局的信息角色和座位状态，快速准备可信、可推理的误导方案。</p></div></div>
+          <div className="advice-rule-banner"><EyeOff/><div><strong>醉酒或中毒的玩家没有能力</strong><span>说书人仍会模拟其能力，给出的信息可以为真也可以为假。下方建议是备选思路，不会自动改变规则或日志。</span></div></div>
+          <div className="advice-grid">{adviceRoles.length ? adviceRoles.map((role) => {
+            const seat = seats.find((item) => item.roleId === role.id);
+            const canMislead = seat?.statuses.includes('poisoned') || seat?.statuses.includes('drunk');
+            return <article key={role.id} className={`advice-card ${canMislead ? 'is-active' : ''}`}>
+              <header><RoleIcon role={role}/><div><h4>{role.name}</h4><span>{seat ? `${seat.number}号 · ${canMislead ? '当前可给错误信息' : '当前未标记醉酒/中毒'}` : '尚未分配座位'}</span></div>{canMislead && <b>可误导</b>}</header>
+              <p>{role.ability}</p>
+              <ul>{role.misinformation!.map((tip) => <li key={tip}><Lightbulb/>{tip}</li>)}</ul>
+            </article>;
+          }) : <div className="advice-empty"><Lightbulb/><h4>当前配板没有可建议的信息角色</h4><p>选择贵族、店小二、占卜师、气球驾驶员、博学者、失忆者或秉笔后，这里会生成对应建议。</p></div>}</div>
         </section>}
 
         {view === 'history' && <section className="history-workspace">
@@ -362,6 +393,13 @@ export default function BoardBuilder() {
         <div className="board-heading"><div><span className="eyebrow">LIVE BOARD</span><h2>当前配板</h2></div><span className="total-count">{selectedRoles.length}<small>/{playerCount}</small></span></div>
         <div className="board-actions"><Button className="random-board" onClick={() => buildBoard(true)}><Dice5/>随机配板</Button><Button variant="outline" onClick={() => buildBoard(false)}><Sparkles/>按名额补齐</Button><Button variant="outline" onClick={() => { setSelected(new Set(locked)); resetRoundState(); }}><RotateCcw/>清空未锁定</Button></div>
         <section className={`evil-win-status ${demonDefeated ? 'is-good-win' : deathsUntilEvilWin === 0 ? 'is-at-line' : ''}`}>{demonDefeated ? <ShieldCheck/> : <Skull/>}<div><span>{demonDefeated ? '游戏胜负' : '邪恶方人数胜利线'}</span><strong>{demonDefeated ? '恶魔已死亡，善良方获胜' : deathsUntilEvilWin ? `还需死亡 ${deathsUntilEvilWin} 人` : '邪恶方胜利人数条件已达成'}</strong><small>{demonDefeated ? '角色能力另有说明时除外' : '所有阵营都计入存活人数；恶魔死亡则善良获胜'}</small></div><b>{aliveCount}<small> 存活</small></b></section>
+        <section className="demon-bluffs"><div className="bluff-heading"><div><EyeOff/><span><b>恶魔的三个伪装</b><small>仅可选择当前不在场的善良角色</small></span></div><button onClick={randomizeBluffs} disabled={!selectedRoles.some((role) => role.alignment === 'demon') || availableBluffs.length < 3}><Shuffle/>随机</button></div>
+          {selectedRoles.some((role) => role.alignment === 'demon') ? <div className="bluff-slots">{demonBluffs.map((roleId,index) => {
+            const role = script.roles.find((item) => item.id === roleId);
+            const options = availableBluffs.filter((item) => !demonBluffs.includes(item.id) || item.id === roleId);
+            return <label className="bluff-slot" key={index}><span>{role ? <RoleIcon role={role}/> : <b>{index + 1}</b>}</span><NativeSelect value={roleId ?? ''} onChange={(event) => setBluff(index,event.target.value || null)} aria-label={`第${index + 1}个恶魔伪装`}><NativeSelectOption value="">选择伪装</NativeSelectOption>{options.map((item) => <NativeSelectOption key={item.id} value={item.id}>{item.name} · {alignmentMeta[item.alignment].short}</NativeSelectOption>)}</NativeSelect></label>;
+          })}</div> : <p className="bluff-empty">选入恶魔后即可设置；随机配板会自动生成三个不在场身份。</p>}
+        </section>
         <div className="selected-groups">{alignments.map((alignment) => <section key={alignment} className={`selected-group group-${alignment}`}><div><span>{alignmentMeta[alignment].short}</span><b>{totals[alignment]} / {quota[alignment]}</b></div><ul>{selectedRoles.filter((role) => role.alignment === alignment).map((role) => <li key={role.id}><RoleIcon role={role} className="mini-role-icon"/>{role.name}{locked.has(role.id) && <Lock size={11}/>}</li>)}</ul>{!totals[alignment] && <p>尚未选择</p>}</section>)}</div>
         <section className="validation"><h3><ShieldCheck size={17}/>基础校验</h3><div className="message-list">{messages.map((message,index) => <div key={`${message.text}-${index}`} className={`message message-${message.type}`}>{message.type === 'warn' ? <AlertTriangle size={15}/> : message.type === 'ok' ? <Check size={15}/> : <CircleHelp size={15}/>}<span>{message.text}</span></div>)}</div></section>
       </aside>
