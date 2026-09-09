@@ -105,9 +105,10 @@ function NightList({ title, steps, selected, seats, roles, bluffs, completed, on
     <ol>{visible.map((step, index) => {
       const assignedSeat = step.roleId ? seats.find((seat) => seat.roleId === step.roleId) : undefined;
       const assignedRole = step.roleId ? roles.find((role) => role.id === step.roleId) : undefined;
-      const poppyDemonInfo = selected.has('poppy-grower') && step.id === 'demon-info';
-      const bluffNames = step.id === 'demon-info' ? bluffs.map((id) => roles.find((role) => role.id === id)?.name).filter(Boolean) : [];
-      const demonInfo = step.id === 'demon-info' && bluffNames.length ? `${poppyDemonInfo ? '罂粟种植者在场：不告知爪牙。' : step.note} 说书人展示给恶魔：${bluffNames.join('、')}。` : poppyDemonInfo ? '罂粟种植者在场：说书人只向恶魔展示三项伪装，不告知爪牙。' : step.note;
+      const isDemonInfo = step.id.endsWith('demon-info');
+      const poppyDemonInfo = selected.has('poppy-grower') && isDemonInfo;
+      const bluffNames = isDemonInfo ? bluffs.map((id) => roles.find((role) => role.id === id)?.name).filter(Boolean) : [];
+      const demonInfo = isDemonInfo && bluffNames.length ? `${poppyDemonInfo ? '罂粟种植者在场：不告知爪牙。' : step.note} 说书人展示给恶魔：${bluffNames.join('、')}。` : poppyDemonInfo ? '罂粟种植者在场：说书人只向恶魔展示三项伪装，不告知爪牙。' : step.note;
       return <li key={step.id} className={completed.has(step.id) ? 'is-complete' : ''}>
         <span className="night-index">{String(index + 1).padStart(2, '0')}</span>
         <Checkbox checked={completed.has(step.id)} onCheckedChange={() => onToggle(step.id)} aria-label={`完成${step.name}`}/>
@@ -182,6 +183,9 @@ export default function BoardBuilder() {
     if (selected.has('atheist') && selectedRoles.some((role) => role.alignment === 'minion' || role.alignment === 'demon')) result.push({ type:'warn', text:'无神论者要求没有邪恶角色在场，与当前选择冲突。' });
     if (selected.has('balloonist')) result.push({ type:'ok', text:'已应用气球驾驶员配置：镇民 -1，外来者 +1。' });
     if (selected.has('marionette')) result.push({ type:'info', text:'提线木偶需要与恶魔邻座，安排座位时请检查。' });
+    if (selected.has('godfather')) result.push({ type:'info', text:'教父会让外来者数量 -1 或 +1；请按本局决定手动调整配板。' });
+    if (selected.has('vigormortis')) result.push({ type:'info', text:'亡骨魔配置通常为外来者 -1、镇民 +1；请检查最终名额。' });
+    if (selected.has('fang-gu')) result.push({ type:'info', text:'方古配置通常为外来者 +1、镇民 -1；请检查最终名额。' });
     const assignedCount = seats.filter((seat) => seat.roleId).length;
     if (assignedCount && assignedCount < playerCount) result.push({ type:'info', text:`座位身份已分配 ${assignedCount}/${playerCount}。` });
     return result;
@@ -330,6 +334,7 @@ export default function BoardBuilder() {
     <section className="workspace">
       <div className="catalog-panel">
         <div className="script-heading"><div><span className="eyebrow">当前剧本</span><h2>{script.name}</h2><p>{script.description}</p></div><span className="author">作者 · {script.author}</span></div>
+        {!!script.specialRules?.length && <div className="special-rule-strip">{script.specialRules.map((rule) => <span key={rule.name}><CircleHelp/><b>{rule.name}</b>{rule.description}</span>)}</div>}
         <div className="quota-strip"><span className="quota-title"><Users size={16}/>{playerCount} 人{balloonistSetupActive ? '调整后' : '标准'}名额</span>{alignments.map((alignment) => <span key={alignment} className={`quota quota-${alignment}`}>{alignmentMeta[alignment].short}<b>{quota[alignment]}</b></span>)}{balloonistSetupActive && <span className="quota-modifier">气球驾驶员：镇民 −1 · 外来者 +1</span>}</div>
         <nav className="workspace-nav" aria-label="工具视图">
           <button className={view === 'roles' ? 'is-active' : ''} onClick={() => setView('roles')}><LayoutGrid/>角色配板</button>

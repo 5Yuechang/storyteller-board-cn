@@ -26,6 +26,10 @@ button,select { font:inherit; } button { cursor:pointer; }
 .script-heading h2,.board-heading h2 { margin:3px 0; font-family:var(--font-display); font-size:31px; line-height:1; letter-spacing:.08em; color:#1b4449; }
 .script-heading p { margin:8px 0 0; font-size:13px; color:#676961; }
 .author { border:1px solid #c6b78f; border-radius:999px; padding:6px 10px; color:#705b2d; background:#f6edda; font-size:12px; white-space:nowrap; }
+.special-rule-strip { display:flex; flex-wrap:wrap; gap:7px; padding:11px 0 0; }
+.special-rule-strip span { display:inline-flex; align-items:center; gap:5px; padding:6px 8px; border:1px solid #d4b978; border-radius:5px; color:#705a2d; background:#f4ead1; font-size:10px; }
+.special-rule-strip svg { width:13px; }
+.special-rule-strip b { color:#654722; }
 .quota-strip { display:flex; align-items:center; gap:8px; padding:14px 0 18px; flex-wrap:wrap; }
 .quota-title { display:inline-flex; gap:7px; align-items:center; margin-right:7px; color:#46585a; font-size:13px; font-weight:700; }
 .quota { display:inline-flex; align-items:center; gap:7px; padding:5px 9px; border-radius:6px; background:#ebe6da; font-size:12px; }
