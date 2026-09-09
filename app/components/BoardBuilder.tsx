@@ -1,15 +1,19 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { AlertTriangle, Check, CircleHelp, Dice5, LayoutGrid, Lock, Moon, RotateCcw, ShieldCheck, Shuffle, Skull, Sparkles, Sunrise, UserRound, Users } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { AlertTriangle, BookOpen, Check, ChevronRight, CircleHelp, Dice5, LayoutGrid, Lock, Moon, Play, Plus, RotateCcw, ShieldCheck, Shuffle, Skull, Sparkles, Sunrise, Trash2, UserRound, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { alignmentMeta, scripts, type Alignment, type NightStep, type Role } from '@/app/data/scripts';
 
 const alignments: Alignment[] = ['townsfolk', 'outsider', 'minion', 'demon'];
-type ViewMode = 'roles' | 'seats' | 'night';
+type ViewMode = 'roles' | 'seats' | 'night' | 'history';
+type GamePhase = 'firstNight'|'day'|'night';
+type LogKind = 'system'|'death'|'status'|'role'|'night'|'note';
+type LogEntry = { id:string; dayNumber:number; phase:GamePhase; kind:LogKind; title:string; detail?:string; createdAt:number };
 type SeatStatus = 'poisoned'|'drunk'|'protected'|'noAbility'|'abilityUsed'|'turnedGood'|'turnedEvil';
 type Seat = { number: number; roleId: string | null; alive: boolean; statuses: SeatStatus[] };
 
@@ -19,6 +23,7 @@ const seatStatusMeta: Record<SeatStatus, { label: string; short: string }> = {
   turnedGood:{label:'已转为善良',short:'善'}, turnedEvil:{label:'已转为邪恶',short:'恶'},
 };
 const seatStatuses = Object.keys(seatStatusMeta) as SeatStatus[];
+const phaseName = (phase: GamePhase, dayNumber: number) => phase === 'firstNight' ? '首个夜晚' : `第 ${dayNumber} ${phase === 'day' ? '天' : '夜'}`;
 
 const makeSeats = (count: number): Seat[] => Array.from({ length: count }, (_, index) => ({ number: index + 1, roleId: null, alive: true, statuses: [] }));
 const withBalloonistSetup = (quota: Record<Alignment, number>, enabled: boolean): Record<Alignment, number> => enabled ? {
@@ -118,6 +123,12 @@ export default function BoardBuilder() {
   const [activeSeat, setActiveSeat] = useState(1);
   const [nightMode, setNightMode] = useState<'first'|'other'>('first');
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
+  const [gameStarted, setGameStarted] = useState(false);
+  const [gamePhase, setGamePhase] = useState<GamePhase>('firstNight');
+  const [dayNumber, setDayNumber] = useState(1);
+  const [gameLog, setGameLog] = useState<LogEntry[]>([]);
+  const [manualNote, setManualNote] = useState('');
+  const [historyReady, setHistoryReady] = useState(false);
   const script = scripts.find((item) => item.id === scriptId) ?? scripts[0];
   const baseQuota = script.counts[playerCount];
   const balloonistSetupActive = selected.has('balloonist');
@@ -129,6 +140,25 @@ export default function BoardBuilder() {
   const deathsUntilEvilWin = Math.max(0, aliveCount - 2);
   const demonSeats = seats.filter((seat) => script.roles.find((role) => role.id === seat.roleId)?.alignment === 'demon');
   const demonDefeated = demonSeats.length > 0 && demonSeats.every((seat) => !seat.alive);
+
+  useEffect(() => {
+    fetch('/api/game-history').then((response) => response.ok ? response.json() : Promise.reject()).then((saved) => {
+      if (saved.state?.scriptId === scriptId) {
+        setDayNumber(saved.state.dayNumber);
+        setGamePhase(saved.state.phase);
+        setGameStarted(saved.state.gameStarted);
+        setGameLog(saved.logs ?? []);
+      }
+    }).catch(() => undefined).finally(() => setHistoryReady(true));
+  }, []);
+
+  useEffect(() => {
+    if (!historyReady) return;
+    const timer = window.setTimeout(() => {
+      void fetch('/api/game-history', { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ scriptId, dayNumber, phase:gamePhase, gameStarted, logs:gameLog }) });
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [dayNumber, gameLog, gamePhase, gameStarted, historyReady, scriptId]);
 
   const messages = useMemo(() => {
     const result: { type: 'ok'|'warn'|'info'; text: string }[] = [];
@@ -143,7 +173,11 @@ export default function BoardBuilder() {
     return result;
   }, [playerCount, quota, seats, selected, selectedRoles, totals]);
 
-  function resetRoundState() { setSeats(makeSeats(playerCount)); setActiveSeat(1); setCompletedSteps(new Set()); }
+  function addLog(kind: LogKind, title: string, detail?: string, phase = gamePhase, day = dayNumber) {
+    const createdAt = Date.now();
+    setGameLog((current) => [...current, { id:`${createdAt}-${Math.random().toString(36).slice(2,8)}`, dayNumber:day, phase, kind, title, detail, createdAt }]);
+  }
+  function resetRoundState() { setSeats(makeSeats(playerCount)); setActiveSeat(1); setCompletedSteps(new Set()); setGameStarted(false); setGamePhase('firstNight'); setDayNumber(1); setGameLog([]); }
   function toggleRole(role: Role) {
     if (locked.has(role.id)) return;
     setSelected((current) => { const next = new Set(current); next.has(role.id) ? next.delete(role.id) : next.add(role.id); return next; });
@@ -183,19 +217,25 @@ export default function BoardBuilder() {
     setCompletedSteps(new Set());
   }
   function changeScript(id: string) {
-    setScriptId(id); setSelected(new Set()); setLocked(new Set()); setSeats(makeSeats(playerCount)); setActiveSeat(1); setCompletedSteps(new Set()); setView('roles');
+    setScriptId(id); setSelected(new Set()); setLocked(new Set()); setSeats(makeSeats(playerCount)); setActiveSeat(1); setCompletedSteps(new Set()); setGameStarted(false); setGamePhase('firstNight'); setDayNumber(1); setGameLog([]); setView('roles');
   }
   function assignRole(seatNumber: number, roleId: string | null) {
+    const currentSeat = seats.find((seat) => seat.number === seatNumber);
+    const oldRole = script.roles.find((role) => role.id === currentSeat?.roleId);
+    const newRole = script.roles.find((role) => role.id === roleId);
     setSeats((current) => current.map((seat) => {
       if (roleId && seat.roleId === roleId) return { ...seat, roleId:null };
       return seat.number === seatNumber ? { ...seat, roleId } : seat;
     }));
+    if (gameStarted && oldRole?.id !== newRole?.id) addLog('role', `${seatNumber}号身份${oldRole ? '发生变化' : '已设置'}`, `${oldRole?.name ?? '未分配'} → ${newRole?.name ?? '未分配'}`);
   }
   function randomizeSeats() {
     const roles = shuffled(selectedRoles);
     setSeats((current) => current.map((seat, index) => ({ ...seat, roleId:roles[index]?.id ?? null, alive:true, statuses:[] })));
   }
   function toggleSeatStatus(seatNumber: number, status: SeatStatus) {
+    const target = seats.find((seat) => seat.number === seatNumber);
+    const adding = !target?.statuses.includes(status);
     setSeats((current) => current.map((seat) => {
       if (seat.number !== seatNumber) return seat;
       const next = new Set(seat.statuses);
@@ -207,9 +247,41 @@ export default function BoardBuilder() {
       }
       return { ...seat, statuses:Array.from(next) };
     }));
+    if (gameStarted) addLog('status', `${seatNumber}号${adding ? '获得' : '移除'}“${seatStatusMeta[status].label}”`, script.roles.find((role) => role.id === target?.roleId)?.name);
+  }
+  function toggleSeatAlive(seatNumber: number) {
+    const target = seats.find((seat) => seat.number === seatNumber);
+    if (!target) return;
+    setSeats((current) => current.map((seat) => seat.number === seatNumber ? { ...seat, alive:!seat.alive } : seat));
+    if (gameStarted) addLog('death', `${seatNumber}号${target.alive ? '死亡' : '复活'}`, script.roles.find((role) => role.id === target.roleId)?.name);
   }
   function toggleNightStep(id: string) {
+    const completing = !completedSteps.has(id);
     setCompletedSteps((current) => { const next = new Set(current); next.has(id) ? next.delete(id) : next.add(id); return next; });
+    if (gameStarted && completing) {
+      const step = [...script.nightOrder.first,...script.nightOrder.other].find((item) => item.id === id);
+      if (step) addLog('night', `完成夜间步骤：${step.name}`, step.note);
+    }
+  }
+  function startGame() {
+    setGameStarted(true); setGamePhase('firstNight'); setDayNumber(1); setNightMode('first');
+    addLog('system','游戏开始','进入首个夜晚','firstNight',1);
+  }
+  function advancePhase() {
+    let nextPhase: GamePhase;
+    let nextDay = dayNumber;
+    if (gamePhase === 'firstNight') nextPhase = 'day';
+    else if (gamePhase === 'day') nextPhase = 'night';
+    else { nextPhase = 'day'; nextDay += 1; }
+    setGamePhase(nextPhase); setDayNumber(nextDay); setNightMode(nextPhase === 'firstNight' ? 'first' : 'other'); setCompletedSteps(new Set());
+    addLog('system',`进入${phaseName(nextPhase,nextDay)}`,undefined,nextPhase,nextDay);
+  }
+  function submitManualNote() {
+    const text = manualNote.trim();
+    if (!text) return;
+    if (!gameStarted) startGame();
+    addLog('note',text,undefined,gameStarted ? gamePhase : 'firstNight',gameStarted ? dayNumber : 1);
+    setManualNote('');
   }
 
   return <main className="app-shell">
@@ -228,7 +300,9 @@ export default function BoardBuilder() {
           <button className={view === 'roles' ? 'is-active' : ''} onClick={() => setView('roles')}><LayoutGrid/>角色配板</button>
           <button className={view === 'seats' ? 'is-active' : ''} onClick={() => setView('seats')}><Users/>环形座位</button>
           <button className={view === 'night' ? 'is-active' : ''} onClick={() => setView('night')}><Moon/>唤醒顺序</button>
+          <button className={view === 'history' ? 'is-active' : ''} onClick={() => setView('history')}><BookOpen/>对局日志</button>
         </nav>
+        <section className={`phase-bar ${gameStarted ? 'is-running' : ''}`}><div><span className="phase-dot"/><p><small>当前阶段</small><strong>{gameStarted ? phaseName(gamePhase,dayNumber) : '尚未开始记录'}</strong></p></div>{gameStarted ? <Button onClick={advancePhase}>进入下一阶段<ChevronRight/></Button> : <Button onClick={startGame}><Play/>开始记录</Button>}<button className="log-shortcut" onClick={() => setView('history')}><BookOpen/><span>{gameLog.length} 条记录</span></button></section>
 
         {view === 'roles' && <Tabs defaultValue="townsfolk" className="role-tabs">
           <TabsList className="alignment-tabs" aria-label="按阵营浏览角色">{alignments.map((alignment) => <TabsTrigger key={alignment} value={alignment}>{alignmentMeta[alignment].short}<span>{script.roles.filter((role) => role.alignment === alignment).length}</span></TabsTrigger>)}</TabsList>
@@ -241,7 +315,7 @@ export default function BoardBuilder() {
           <div className="seat-editor">
             <div className="seat-editor-number"><span>{activeSeatState.number}</span><div><b>{activeSeatState.number}号座位</b><small>{activeSeatState.alive ? '当前存活' : '当前死亡'}</small></div></div>
             <label><span>身份</span><NativeSelect value={activeSeatState.roleId ?? ''} onChange={(event) => assignRole(activeSeatState.number, event.target.value || null)} aria-label={`${activeSeatState.number}号身份`}><NativeSelectOption value="">未分配身份</NativeSelectOption>{alignments.map((alignment) => <optgroup key={alignment} label={alignmentMeta[alignment].short}>{selectedRoles.filter((role) => role.alignment === alignment).map((role) => <NativeSelectOption key={role.id} value={role.id}>{role.name}</NativeSelectOption>)}</optgroup>)}</NativeSelect></label>
-            <Button variant={activeSeatState.alive ? 'outline' : 'destructive'} onClick={() => setSeats((current) => current.map((seat) => seat.number === activeSeatState.number ? { ...seat, alive:!seat.alive } : seat))}>{activeSeatState.alive ? <><UserRound/>标记死亡</> : <><Sparkles/>恢复存活</>}</Button>
+            <Button variant={activeSeatState.alive ? 'outline' : 'destructive'} onClick={() => toggleSeatAlive(activeSeatState.number)}>{activeSeatState.alive ? <><UserRound/>标记死亡</> : <><Sparkles/>恢复存活</>}</Button>
             <div className="seat-status-editor"><span>状态标记</span><div>{seatStatuses.map((status) => <button key={status} className={`${activeSeatState.statuses.includes(status) ? 'is-active' : ''} status-${status}`} onClick={() => toggleSeatStatus(activeSeatState.number,status)} aria-pressed={activeSeatState.statuses.includes(status)}>{seatStatusMeta[status].short}<b>{seatStatusMeta[status].label}</b></button>)}</div></div>
           </div>
         </section>}
@@ -251,6 +325,16 @@ export default function BoardBuilder() {
           <div className="night-toggle"><button className={nightMode === 'first' ? 'is-active' : ''} onClick={() => setNightMode('first')}><Moon/>首个夜晚</button><button className={nightMode === 'other' ? 'is-active' : ''} onClick={() => setNightMode('other')}><Sunrise/>其他夜晚</button></div>
           <NightList title={nightMode === 'first' ? '首个夜晚' : '其他夜晚'} steps={script.nightOrder[nightMode]} selected={selected} seats={seats} roles={script.roles} completed={completedSteps} onToggle={toggleNightStep}/>
           <p className="night-footnote">提示：中毒、醉酒、角色变化及自定义能力可能改变实际处理方式，说书人应结合当前场况判断。</p>
+        </section>}
+
+        {view === 'history' && <section className="history-workspace">
+          <div className="view-heading"><div><span className="eyebrow">GAME REVIEW</span><h3>对局日志与复盘</h3><p>关键操作自动记录，也可以随时补充说书人备注。</p></div>{gameLog.length > 0 && <Button variant="outline" onClick={() => setGameLog([])}><Trash2/>清空日志</Button>}</div>
+          <form className="quick-note" onSubmit={(event) => { event.preventDefault(); submitManualNote(); }}><Input value={manualNote} onChange={(event) => setManualNote(event.target.value)} placeholder="记录提名、处决、能力结果或其他关键事件…" aria-label="对局备注"/><Button type="submit" disabled={!manualNote.trim()}><Plus/>添加记录</Button></form>
+          <div className="history-timeline">{gameLog.length ? gameLog.map((entry,index) => {
+            const previous = gameLog[index - 1];
+            const showPhase = !previous || previous.phase !== entry.phase || previous.dayNumber !== entry.dayNumber;
+            return <div key={entry.id}>{showPhase && <h4><span/>{phaseName(entry.phase,entry.dayNumber)}</h4>}<article className={`log-entry log-${entry.kind}`}><span className="log-mark"/><div><strong>{entry.title}</strong>{entry.detail && <p>{entry.detail}</p>}</div><time>{new Date(entry.createdAt).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})}</time><button onClick={() => setGameLog((current) => current.filter((item) => item.id !== entry.id))} aria-label={`删除记录：${entry.title}`}><Trash2/></button></article></div>;
+          }) : <div className="history-empty"><BookOpen/><h4>还没有对局记录</h4><p>点击上方“开始记录”，死亡、状态变化和夜间步骤会自动出现在这里。</p></div>}</div>
         </section>}
       </div>
 

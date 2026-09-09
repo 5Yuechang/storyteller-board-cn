@@ -38,6 +38,17 @@ button,select { font:inherit; } button { cursor:pointer; }
 .workspace-nav button svg { width:15px; }
 .workspace-nav button:hover { color:#1e5056; background:#ffffff66; }
 .workspace-nav button.is-active { color:#fffaf0; background:#174e55; box-shadow:0 2px 8px #173e4328; }
+.phase-bar { display:grid; grid-template-columns:minmax(180px,1fr) auto auto; align-items:center; gap:10px; margin:-6px 0 18px; padding:10px 12px; border:1px solid #d3c8b8; background:#f3eee3; }
+.phase-bar>div { display:flex; align-items:center; gap:9px; }
+.phase-dot { width:10px; height:10px; flex:none; border-radius:50%; background:#9b9589; box-shadow:0 0 0 4px #9b95891c; }
+.phase-bar.is-running .phase-dot { background:#a04439; box-shadow:0 0 0 4px #a0443920; animation:phase-pulse 2s ease-in-out infinite; }
+.phase-bar p { display:flex; flex-direction:column; gap:1px; margin:0; }
+.phase-bar p small { color:#858178; font-size:9px; }
+.phase-bar p strong { color:#284c50; font-size:13px; }
+.phase-bar button { height:32px; font-size:11px; }
+.log-shortcut { display:flex; align-items:center; gap:6px; border:0; padding:0 5px; color:#6e6b63; background:transparent; }
+.log-shortcut svg { width:14px; }
+@keyframes phase-pulse { 50% { box-shadow:0 0 0 7px #a0443908; } }
 .alignment-tabs { width:100%; height:42px!important; justify-content:flex-start; gap:6px; padding:5px; background:#e8e1d3; }
 .alignment-tabs button { flex:0 1 158px; height:32px; }
 .alignment-tabs button span { border-radius:99px; background:#0000000b; padding:1px 6px; font-size:11px; }
@@ -186,5 +197,29 @@ button,select { font:inherit; } button { cursor:pointer; }
 .night-seat-minion,.night-seat-demon { color:#8a3d34; background:#f1dfdb; }
 .night-footnote { margin:11px 2px 0; color:#89867c; font-size:10px; line-height:1.55; }
 
+.quick-note { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; padding:12px; border:1px solid #d3c8b8; background:#eee8dc; }
+.quick-note [data-slot="input"] { height:36px; background:#fffdf7; }
+.quick-note button { height:36px; }
+.history-timeline { max-width:850px; margin:18px auto 0; }
+.history-timeline h4 { display:flex; align-items:center; gap:9px; margin:18px 0 8px; color:#876a31; font-family:var(--font-display); font-size:17px; }
+.history-timeline h4 span { width:9px; height:9px; border:2px solid #b9934a; border-radius:50%; background:#f8f2e6; }
+.log-entry { position:relative; display:grid; grid-template-columns:14px minmax(0,1fr) auto 24px; align-items:start; gap:9px; min-height:55px; margin-left:4px; padding:10px 10px 10px 15px; border-left:1px solid #c9bda8; background:#fffdf8; }
+.log-entry+.log-entry { border-top:1px solid #e4ddd1; }
+.log-mark { width:7px; height:7px; margin-top:6px; border-radius:50%; background:#66888a; }
+.log-death .log-mark { background:#a14439; }
+.log-status .log-mark { background:#765286; }
+.log-role .log-mark { background:#b48739; }
+.log-note .log-mark { background:#4c7895; }
+.log-entry strong { color:#2a4c50; font-size:12px; }
+.log-entry p { margin:3px 0 0; color:#747269; font-size:10px; line-height:1.45; }
+.log-entry time { margin-top:2px; color:#aaa296; font-size:9px; }
+.log-entry>button { width:24px; height:24px; display:grid; place-items:center; border:0; border-radius:4px; color:#aaa296; background:transparent; }
+.log-entry>button:hover { color:#943d35; background:#f2e3df; }
+.log-entry>button svg { width:13px; }
+.history-empty { display:grid; place-items:center; min-height:260px; padding:35px; color:#989187; text-align:center; }
+.history-empty>svg { width:34px; height:34px; color:#b99b62; }
+.history-empty h4 { display:block; margin:12px 0 4px; color:#4c6667; font-family:var(--font-display); }
+.history-empty p { max-width:420px; margin:0; font-size:11px; line-height:1.6; }
+
 @media(max-width:1050px){.workspace{grid-template-columns:1fr 310px;padding:18px}.role-grid{grid-template-columns:1fr}.seat-ring{width:min(590px,96%)}.seat-token{width:88px}.seat-editor{grid-template-columns:1fr 1fr}.seat-editor-number{grid-column:1/-1}}
-@media(max-width:760px){.topbar{height:auto;min-height:78px;padding:12px 16px;flex-wrap:wrap}.brand-copy{flex:1}.header-controls{width:100%;margin:0}.header-controls label{flex:1}.header-controls label>span{display:none}.header-controls [data-slot="native-select-wrapper"]{width:100%}.workspace{display:block;padding:12px}.catalog-panel{padding:16px}.script-heading{display:block}.author{display:inline-block;margin-top:12px}.workspace-nav{overflow-x:auto}.workspace-nav button{min-width:108px}.section-title p{display:none}.alignment-tabs{overflow-x:auto;justify-content:flex-start}.alignment-tabs button{min-width:92px}.board-panel{position:static;max-height:none;margin-top:12px}.view-heading{display:block}.view-heading>div:last-child{margin-top:12px}.seat-ring{width:520px;margin-left:50%;transform:translateX(-50%) scale(.72);margin-top:-65px;margin-bottom:-65px}.seat-editor{grid-template-columns:1fr}.seat-editor-number{grid-column:auto}.night-list li{grid-template-columns:25px 18px 32px minmax(0,1fr) auto}.night-role-icon{width:30px;height:30px}.night-seat{grid-column:4}.phase{grid-column:5;grid-row:1}.night-list li small{font-size:9px}.role-card>p,.role-foot{margin-left:0}}
+@media(max-width:760px){.topbar{height:auto;min-height:78px;padding:12px 16px;flex-wrap:wrap}.brand-copy{flex:1}.header-controls{width:100%;margin:0}.header-controls label{flex:1}.header-controls label>span{display:none}.header-controls [data-slot="native-select-wrapper"]{width:100%}.workspace{display:block;padding:12px}.catalog-panel{padding:16px}.script-heading{display:block}.author{display:inline-block;margin-top:12px}.workspace-nav{overflow-x:auto}.workspace-nav button{min-width:108px}.phase-bar{grid-template-columns:1fr auto}.log-shortcut{grid-column:1/-1}.section-title p{display:none}.alignment-tabs{overflow-x:auto;justify-content:flex-start}.alignment-tabs button{min-width:92px}.board-panel{position:static;max-height:none;margin-top:12px}.view-heading{display:block}.view-heading>div:last-child{margin-top:12px}.seat-ring{width:520px;margin-left:50%;transform:translateX(-50%) scale(.72);margin-top:-65px;margin-bottom:-65px}.seat-editor{grid-template-columns:1fr}.seat-editor-number{grid-column:auto}.night-list li{grid-template-columns:25px 18px 32px minmax(0,1fr) auto}.night-role-icon{width:30px;height:30px}.night-seat{grid-column:4}.phase{grid-column:5;grid-row:1}.night-list li small{font-size:9px}.quick-note{grid-template-columns:1fr}.log-entry{grid-template-columns:12px minmax(0,1fr) 24px}.log-entry time{display:none}.role-card>p,.role-foot{margin-left:0}}
