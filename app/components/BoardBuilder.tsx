@@ -344,7 +344,7 @@ export default function BoardBuilder() {
         {mobileBoardOpen ? <ChevronUp/> : <ChevronDown/>}
       </button>
       <div className="catalog-panel">
-        <div className="script-heading"><div><span className="eyebrow">当前剧本</span><h2>{script.name}</h2><p>{script.description}</p></div><span className="author">作者 · {script.author}</span></div>
+        <div className="script-heading"><div><span className="eyebrow">当前剧本</span><h2>{script.name}</h2></div></div>
         {!!script.specialRules?.length && <div className="special-rule-strip">{script.specialRules.map((rule) => <span key={rule.name}><CircleHelp/><b>{rule.name}</b>{rule.description}</span>)}</div>}
         <div className="quota-strip"><span className="quota-title"><Users size={16}/>{playerCount} 人{balloonistSetupActive ? '调整后' : '标准'}名额</span>{alignments.map((alignment) => <span key={alignment} className={`quota quota-${alignment}`}>{alignmentMeta[alignment].short}<b>{quota[alignment]}</b></span>)}{balloonistSetupActive && <span className="quota-modifier">气球驾驶员：镇民 −1 · 外来者 +1</span>}</div>
         <nav className="workspace-nav" aria-label="工具视图">
