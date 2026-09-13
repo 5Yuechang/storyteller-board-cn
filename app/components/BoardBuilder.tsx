@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, BookOpen, Check, ChevronRight, CircleHelp, Dice5, EyeOff, LayoutGrid, Lightbulb, Lock, Moon, Play, Plus, RotateCcw, ShieldCheck, Shuffle, Skull, Sparkles, Sunrise, Trash2, UserRound, Users } from 'lucide-react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { AlertTriangle, BookOpen, Check, ChevronDown, ChevronRight, ChevronUp, CircleHelp, Dice5, EyeOff, LayoutGrid, Lightbulb, Lock, Moon, Play, Plus, RotateCcw, ShieldCheck, Shuffle, Skull, Sparkles, Sunrise, Trash2, UserRound, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -73,7 +73,12 @@ function SeatMap({ seats, roles, activeSeat, onSelect }: { seats: Seat[]; roles:
       return <button
         key={seat.number}
         className={`seat-token ${role ? `seat-${role.alignment}` : ''} ${side ? `seat-side-${side}` : ''} ${seat.alive ? 'is-alive' : 'is-dead'} ${activeSeat === seat.number ? 'is-active' : ''}`}
-        style={{ left: `${50 + Math.sin(angle) * 43}%`, top: `${50 - Math.cos(angle) * 43}%` }}
+        style={{
+          '--seat-left': `${50 + Math.sin(angle) * 43}%`,
+          '--seat-top': `${50 - Math.cos(angle) * 43}%`,
+          '--seat-left-mobile': `${50 + Math.sin(angle) * 38}%`,
+          '--seat-top-mobile': `${50 - Math.cos(angle) * 38}%`,
+        } as CSSProperties}
         onClick={() => onSelect(seat.number)}
         aria-label={`${seat.number}号，${role?.name ?? '未分配'}，${seat.alive ? '存活' : '死亡'}`}
       >
@@ -138,6 +143,7 @@ export default function BoardBuilder() {
   const [manualNote, setManualNote] = useState('');
   const [demonBluffs, setDemonBluffs] = useState<(string|null)[]>([null,null,null]);
   const [historyReady, setHistoryReady] = useState(false);
+  const [mobileBoardOpen, setMobileBoardOpen] = useState(false);
   const script = scripts.find((item) => item.id === scriptId) ?? scripts[0];
   const baseQuota = script.counts[playerCount];
   const balloonistSetupActive = selected.has('balloonist');
@@ -236,7 +242,7 @@ export default function BoardBuilder() {
     setCompletedSteps(new Set());
   }
   function changeScript(id: string) {
-    setScriptId(id); setSelected(new Set()); setLocked(new Set()); setDemonBluffs([null,null,null]); setSeats(makeSeats(playerCount)); setActiveSeat(1); setCompletedSteps(new Set()); setGameStarted(false); setGamePhase('firstNight'); setDayNumber(1); setGameLog([]); setView('roles');
+    setScriptId(id); setSelected(new Set()); setLocked(new Set()); setDemonBluffs([null,null,null]); setSeats(makeSeats(playerCount)); setActiveSeat(1); setCompletedSteps(new Set()); setGameStarted(false); setGamePhase('firstNight'); setDayNumber(1); setGameLog([]); setView('roles'); setMobileBoardOpen(false);
   }
   function randomizeBluffs() {
     setDemonBluffs(shuffled(availableBluffs).slice(0,3).map((role) => role.id));
@@ -332,6 +338,11 @@ export default function BoardBuilder() {
       </div>
     </header>
     <section className="workspace">
+      <button className="mobile-board-toggle" onClick={() => setMobileBoardOpen((open) => !open)} aria-expanded={mobileBoardOpen} aria-controls="current-board-panel">
+        <span className="mobile-board-toggle-title"><LayoutGrid/><span><small>当前配板</small><strong>{selectedRoles.length} / {playerCount} 个角色</strong></span></span>
+        <span className="mobile-board-quota">{alignments.map((alignment) => <i key={alignment}>{alignmentMeta[alignment].short}{totals[alignment]}/{quota[alignment]}</i>)}</span>
+        {mobileBoardOpen ? <ChevronUp/> : <ChevronDown/>}
+      </button>
       <div className="catalog-panel">
         <div className="script-heading"><div><span className="eyebrow">当前剧本</span><h2>{script.name}</h2><p>{script.description}</p></div><span className="author">作者 · {script.author}</span></div>
         {!!script.specialRules?.length && <div className="special-rule-strip">{script.specialRules.map((rule) => <span key={rule.name}><CircleHelp/><b>{rule.name}</b>{rule.description}</span>)}</div>}
@@ -394,7 +405,7 @@ export default function BoardBuilder() {
         </section>}
       </div>
 
-      <aside className="board-panel">
+      <aside id="current-board-panel" className={`board-panel ${mobileBoardOpen ? 'is-mobile-open' : ''}`}>
         <div className="board-heading"><div><span className="eyebrow">LIVE BOARD</span><h2>当前配板</h2></div><span className="total-count">{selectedRoles.length}<small>/{playerCount}</small></span></div>
         <div className="board-actions"><Button className="random-board" onClick={() => buildBoard(true)}><Dice5/>随机配板</Button><Button variant="outline" onClick={() => buildBoard(false)}><Sparkles/>按名额补齐</Button><Button variant="outline" onClick={() => { setSelected(new Set(locked)); resetRoundState(); }}><RotateCcw/>清空未锁定</Button></div>
         <section className={`evil-win-status ${demonDefeated ? 'is-good-win' : deathsUntilEvilWin === 0 ? 'is-at-line' : ''}`}>{demonDefeated ? <ShieldCheck/> : <Skull/>}<div><span>{demonDefeated ? '游戏胜负' : '邪恶方人数胜利线'}</span><strong>{demonDefeated ? '恶魔已死亡，善良方获胜' : deathsUntilEvilWin ? `还需死亡 ${deathsUntilEvilWin} 人` : '邪恶方胜利人数条件已达成'}</strong><small>{demonDefeated ? '角色能力另有说明时除外' : '所有阵营都计入存活人数；恶魔死亡则善良获胜'}</small></div><b>{aliveCount}<small> 存活</small></b></section>
