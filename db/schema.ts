@@ -24,3 +24,11 @@ export const createGameLogsTable = `
 export const createGameLogsOrderIndex = `
   CREATE INDEX IF NOT EXISTS game_logs_created_at_idx ON game_logs(created_at)
 `;
+
+export const createGameSnapshotsTable = `
+  CREATE TABLE IF NOT EXISTS game_snapshots (
+    client_id TEXT PRIMARY KEY,
+    state_json TEXT NOT NULL,
+    updated_at INTEGER NOT NULL
+  )
+`;

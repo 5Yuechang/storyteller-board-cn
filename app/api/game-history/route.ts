@@ -1,40 +1,45 @@
 import { env } from 'cloudflare:workers';
-import { createGameLogsOrderIndex, createGameLogsTable, createGameStateTable } from '@/db/schema';
+import { createGameSnapshotsTable } from '@/db/schema';
 
-type StoredLog = { id:string; dayNumber:number; phase:string; kind:string; title:string; detail?:string; createdAt:number };
+const cookieName = 'storyteller_device';
 
-async function ensureSchema() {
-  await env.DB.batch([
-    env.DB.prepare(createGameStateTable),
-    env.DB.prepare(createGameLogsTable),
-    env.DB.prepare(createGameLogsOrderIndex),
-  ]);
+function getClient(request: Request) {
+  const cookie = request.headers.get('cookie') ?? '';
+  const match = cookie.match(new RegExp(`(?:^|;\\s*)${cookieName}=([^;]+)`));
+  return match ? { id:decodeURIComponent(match[1]), isNew:false } : { id:crypto.randomUUID(), isNew:true };
 }
 
-export async function GET() {
+function responseHeaders(client: { id:string; isNew:boolean }, request: Request) {
+  const headers = new Headers({ 'Content-Type':'application/json' });
+  const secure = new URL(request.url).protocol === 'https:' ? '; Secure' : '';
+  if (client.isNew) headers.append('Set-Cookie',`${cookieName}=${encodeURIComponent(client.id)}; Path=/; Max-Age=31536000; SameSite=Lax${secure}; HttpOnly`);
+  return headers;
+}
+
+async function ensureSchema() {
+  await env.DB.prepare(createGameSnapshotsTable).run();
+}
+
+export async function GET(request: Request) {
   await ensureSchema();
-  const state = await env.DB.prepare('SELECT script_id, day_number, phase, game_started FROM game_state WHERE id = 1').first();
-  const logs = await env.DB.prepare('SELECT id, day_number, phase, kind, title, detail, created_at FROM game_logs ORDER BY created_at ASC').all();
-  return Response.json({
-    state: state ? { scriptId:state.script_id, dayNumber:state.day_number, phase:state.phase, gameStarted:Boolean(state.game_started) } : null,
-    logs: logs.results.map((row) => ({ id:row.id, dayNumber:row.day_number, phase:row.phase, kind:row.kind, title:row.title, detail:row.detail ?? undefined, createdAt:row.created_at })),
-  });
+  const client = getClient(request);
+  const row = await env.DB.prepare('SELECT state_json FROM game_snapshots WHERE client_id = ?').bind(client.id).first<{state_json:string}>();
+  let state: unknown = null;
+  try { state = row?.state_json ? JSON.parse(row.state_json) : null; } catch { state = null; }
+  return new Response(JSON.stringify({ state }),{ headers:responseHeaders(client,request) });
 }
 
 export async function PUT(request: Request) {
   await ensureSchema();
-  const body = await request.json() as { scriptId?:string; dayNumber?:number; phase?:string; gameStarted?:boolean; logs?:StoredLog[] };
-  if (!body.scriptId || !Number.isInteger(body.dayNumber) || !['firstNight','day','night'].includes(body.phase ?? '') || !Array.isArray(body.logs)) {
+  const client = getClient(request);
+  const body = await request.json() as { state?:unknown };
+  if (!body.state || typeof body.state !== 'object') {
     return Response.json({ error:'无效的对局记录' }, { status:400 });
   }
-  const statements = [
-    env.DB.prepare(`INSERT INTO game_state (id, script_id, day_number, phase, game_started, updated_at) VALUES (1, ?, ?, ?, ?, ?)
-      ON CONFLICT(id) DO UPDATE SET script_id=excluded.script_id, day_number=excluded.day_number, phase=excluded.phase, game_started=excluded.game_started, updated_at=excluded.updated_at`)
-      .bind(body.scriptId, body.dayNumber, body.phase, body.gameStarted ? 1 : 0, Date.now()),
-    env.DB.prepare('DELETE FROM game_logs'),
-    ...body.logs.slice(-500).map((entry) => env.DB.prepare('INSERT INTO game_logs (id, day_number, phase, kind, title, detail, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      .bind(entry.id, entry.dayNumber, entry.phase, entry.kind, entry.title, entry.detail ?? null, entry.createdAt)),
-  ];
-  await env.DB.batch(statements);
-  return Response.json({ ok:true });
+  const stateJson = JSON.stringify(body.state);
+  if (stateJson.length > 500_000) return Response.json({ error:'对局记录过大' }, { status:413 });
+  await env.DB.prepare(`INSERT INTO game_snapshots (client_id, state_json, updated_at) VALUES (?, ?, ?)
+    ON CONFLICT(client_id) DO UPDATE SET state_json=excluded.state_json, updated_at=excluded.updated_at`)
+    .bind(client.id,stateJson,Date.now()).run();
+  return new Response(JSON.stringify({ ok:true }),{ headers:responseHeaders(client,request) });
 }
