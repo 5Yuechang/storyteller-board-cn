@@ -108,6 +108,8 @@ function SeatMap({ seats, roles, activeSeat, onSelect, onSwap }: { seats: Seat[]
       const angle = (index / seats.length) * Math.PI * 2;
       const role = roles.find((item) => item.id === seat.roleId);
       const side = seat.statuses.includes('turnedEvil') ? 'evil' : seat.statuses.includes('turnedGood') ? 'good' : role && (role.alignment === 'minion' || role.alignment === 'demon') ? 'evil' : role ? 'good' : '';
+      const tooltipVertical = Math.cos(angle) > 0 ? 'tooltip-below' : 'tooltip-above';
+      const tooltipHorizontal = Math.sin(angle) < -0.45 ? 'tooltip-align-left' : Math.sin(angle) > 0.45 ? 'tooltip-align-right' : 'tooltip-align-center';
       return <button
         key={seat.number}
         data-seat-number={seat.number}
@@ -126,10 +128,16 @@ function SeatMap({ seats, roles, activeSeat, onSelect, onSwap }: { seats: Seat[]
         onPointerCancel={() => { setDraggingSeat(null); setDragTarget(null); setDragOffset({ x:0, y:0 }); didDrag.current = false; }}
         onClick={() => { if (didDrag.current) { didDrag.current = false; return; } onSelect(seat.number); }}
         aria-label={`${seat.number}号，${role?.name ?? '未分配'}，${seat.alive ? '存活' : '死亡'}`}
+        aria-describedby={role ? `seat-ability-${seat.number}` : undefined}
       >
         <span><b>{seat.number}号</b><i>{seat.alive ? '存活' : '死亡'}</i></span>
         <strong>{role && <RoleIcon role={role}/>}<span>{role?.name ?? '未分配身份'}</span></strong>
         {!!seat.statuses.length && <span className="seat-status-list">{seat.statuses.map((status) => <i key={status} className={`seat-status status-${status}`} title={seatStatusMeta[status].label}>{seatStatusMeta[status].short}</i>)}</span>}
+        {role && <span id={`seat-ability-${seat.number}`} role="tooltip" className={`seat-ability-card ${tooltipVertical} ${tooltipHorizontal}`}>
+          <span className="seat-ability-heading"><RoleIcon role={role}/><span><b>{role.name}</b><small>{alignmentMeta[role.alignment].short} · {role.timing ?? '被动'}</small></span></span>
+          <span className="seat-ability-text">{role.ability}</span>
+          {role.setup && <span className="seat-ability-setup">配置：{role.setup}</span>}
+        </span>}
       </button>;
     })}
   </div>;
@@ -489,7 +497,7 @@ export default function BoardBuilder() {
         </Tabs>}
 
         {view === 'seats' && <section className="seat-workspace">
-          <div className="view-heading"><div><span className="eyebrow">GRIMOIRE SEATS</span><h3>环形座位魔典</h3><p>点击座位进行编辑；按住并拖到另一个座位可交换双方全部状态。</p></div><div><Button onClick={randomizeSeats} disabled={!selectedRoles.length}><Shuffle/>随机入座</Button><Button variant="outline" onClick={() => setSeats(makeSeats(playerCount))}><RotateCcw/>清空座位</Button></div></div>
+          <div className="view-heading"><div><span className="eyebrow">GRIMOIRE SEATS</span><h3>环形座位魔典</h3><p>悬停查看技能，点击编辑；按住并拖到另一个座位可交换双方全部状态。</p></div><div><Button onClick={randomizeSeats} disabled={!selectedRoles.length}><Shuffle/>随机入座</Button><Button variant="outline" onClick={() => setSeats(makeSeats(playerCount))}><RotateCcw/>清空座位</Button></div></div>
           <SeatMap seats={seats} roles={script.roles} activeSeat={activeSeat} onSelect={setActiveSeat} onSwap={swapSeats}/>
           <div className="seat-editor">
             <div className="seat-editor-number"><span>{activeSeatState.number}</span><div><b>{activeSeatState.number}号座位</b><small>{activeSeatState.alive ? '当前存活' : '当前死亡'}</small></div></div>
