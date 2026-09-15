@@ -1,13 +1,14 @@
 'use client';
 
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
-import { AlertTriangle, BookOpen, Check, ChevronDown, ChevronRight, ChevronUp, CircleHelp, Dice5, EyeOff, LayoutGrid, Lightbulb, List, Lock, Maximize2, Moon, Play, Plus, RotateCcw, ShieldCheck, Shuffle, Skull, Sparkles, Sunrise, Trash2, UserRound, Users } from 'lucide-react';
+import { AlertTriangle, BookOpen, Check, ChevronDown, ChevronRight, ChevronUp, CircleHelp, Dice5, EyeOff, Gauge, LayoutGrid, Lightbulb, List, Lock, Maximize2, Moon, Play, Plus, RotateCcw, ShieldCheck, Shuffle, Skull, Sparkles, Sunrise, Trash2, UserRound, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { alignmentMeta, scripts, type Alignment, type NightStep, type Role } from '@/app/data/scripts';
+import { evaluateBoardBalance } from '@/app/data/balance';
 
 const alignments: Alignment[] = ['townsfolk', 'outsider', 'minion', 'demon'];
 type ViewMode = 'roles' | 'seats' | 'night' | 'advice' | 'history';
@@ -185,6 +186,9 @@ export default function BoardBuilder() {
   const balloonistSetupActive = selected.has('balloonist');
   const quota = useMemo(() => withBalloonistSetup(baseQuota, balloonistSetupActive), [baseQuota, balloonistSetupActive]);
   const selectedRoles = script.roles.filter((role) => selected.has(role.id));
+  const boardBalance = useMemo(() => evaluateBoardBalance(selectedRoles), [selectedRoles]);
+  const blueFactor = [...boardBalance.factors].filter((factor) => factor.value > 0).sort((a,b) => b.value - a.value)[0];
+  const redFactor = [...boardBalance.factors].filter((factor) => factor.value < 0).sort((a,b) => a.value - b.value)[0];
   const availableBluffs = script.roles.filter((role) => (role.alignment === 'townsfolk' || role.alignment === 'outsider') && !selected.has(role.id));
   const adviceRoles = selectedRoles.filter((role) => role.misinformation?.length);
   const activeSeatState = seats.find((seat) => seat.number === activeSeat) ?? seats[0];
@@ -484,6 +488,13 @@ export default function BoardBuilder() {
       <aside id="current-board-panel" className={`board-panel ${mobileBoardOpen ? 'is-mobile-open' : ''}`}>
         <div className="board-heading"><div><span className="eyebrow">LIVE BOARD</span><h2>当前配板</h2></div><span className="total-count">{selectedRoles.length}<small>/{playerCount}</small></span></div>
         <div className="board-actions"><Button className="random-board" onClick={() => buildBoard(true)}><Dice5/>随机配板</Button><Button variant="outline" onClick={() => buildBoard(false)}><Sparkles/>按名额补齐</Button><Button variant="outline" onClick={() => { setSelected(new Set(locked)); resetRoundState(); }}><RotateCcw/>清空未锁定</Button></div>
+        <section className={`balance-card balance-${boardBalance.tendency}`}>
+          <div className="balance-heading"><Gauge/><div><span>阵营压力指数</span><small>综合角色能力与干扰强度估算</small></div><b>{boardBalance.label}</b></div>
+          <div className="balance-numbers"><strong className="balance-blue">蓝 {boardBalance.blue}%</strong><strong className="balance-red">红 {boardBalance.red}%</strong></div>
+          <div className="balance-track" aria-label={`蓝方 ${boardBalance.blue}%，红方 ${boardBalance.red}%`}><i style={{ width:`${boardBalance.blue}%` }}/><i style={{ width:`${boardBalance.red}%` }}/></div>
+          {selectedRoles.length ? <div className="balance-factors">{blueFactor && <span className="factor-blue"><b>{blueFactor.role.name}</b>{blueFactor.reason}</span>}{redFactor && <span className="factor-red"><b>{redFactor.role.name}</b>{redFactor.reason}</span>}</div> : <p className="balance-empty">选择角色后自动计算当前配板倾向。</p>}
+          <p className="balance-disclaimer">仅供说书人配板参考，不代表实际胜率或规则判定。</p>
+        </section>
         <section className={`evil-win-status ${demonDefeated ? 'is-good-win' : deathsUntilEvilWin === 0 ? 'is-at-line' : ''}`}>{demonDefeated ? <ShieldCheck/> : <Skull/>}<div><span>{demonDefeated ? '游戏胜负' : '邪恶方人数胜利线'}</span><strong>{demonDefeated ? '恶魔已死亡，善良方获胜' : deathsUntilEvilWin ? `还需死亡 ${deathsUntilEvilWin} 人` : '邪恶方胜利人数条件已达成'}</strong><small>{demonDefeated ? '角色能力另有说明时除外' : '所有阵营都计入存活人数；恶魔死亡则善良获胜'}</small></div><b>{aliveCount}<small> 存活</small></b></section>
         <section className="demon-bluffs"><div className="bluff-heading"><div><EyeOff/><span><b>给恶魔的三个伪装</b><small>由说书人准备三个当前不在场的善良角色，首夜展示给恶魔</small></span></div><button onClick={randomizeBluffs} disabled={!selectedRoles.some((role) => role.alignment === 'demon') || availableBluffs.length < 3}><Shuffle/>随机准备</button></div>
           {selectedRoles.some((role) => role.alignment === 'demon') ? <div className="bluff-slots">{demonBluffs.map((roleId,index) => {

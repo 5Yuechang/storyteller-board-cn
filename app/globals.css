@@ -87,6 +87,28 @@ button,select { font:inherit; } button { cursor:pointer; }
 .board-actions { display:grid; grid-template-columns:1fr 1fr; gap:7px; margin:14px 0; }
 .board-actions .random-board { grid-column:1/-1; background:#933e33; }
 .board-actions button { height:34px; font-size:12px; }
+.balance-card { margin:0 0 12px; padding:11px; border:1px solid #c7bca9; background:#f4efe5; }
+.balance-heading { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:8px; }
+.balance-heading>svg { width:20px; color:#596e70; }
+.balance-heading>div { display:flex; flex-direction:column; gap:1px; }
+.balance-heading span { color:#34565a; font-size:11px; font-weight:800; }
+.balance-heading small { color:#8b857a; font-size:9px; }
+.balance-heading>b { border-radius:99px; padding:3px 7px; color:#5e5b55; background:#e5dfd4; font-size:10px; }
+.balance-blue .balance-heading>b { color:#205f87; background:#dcecf6; }
+.balance-red .balance-heading>b { color:#8c3e36; background:#f1dfda; }
+.balance-numbers { display:flex; justify-content:space-between; margin-top:9px; font-size:12px; }
+.balance-blue { color:#246d98; }
+.balance-red { color:#a3443a; }
+.balance-track { display:flex; height:9px; margin-top:5px; overflow:hidden; border:2px solid #fffaf0; border-radius:99px; background:#e1dbd0; box-shadow:0 0 0 1px #c8bdac; }
+.balance-track i:first-child { background:linear-gradient(90deg,#2d7eae,#68a7c9); }
+.balance-track i:last-child { background:linear-gradient(90deg,#cf7669,#9c3d34); }
+.balance-factors { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:9px; }
+.balance-factors span { display:flex; min-width:0; flex-direction:column; gap:1px; padding:6px 7px; border-radius:4px; font-size:9px; line-height:1.35; }
+.balance-factors b { overflow:hidden; font-size:10px; text-overflow:ellipsis; white-space:nowrap; }
+.factor-blue { color:#356a87; background:#e4f0f6; }
+.factor-red { color:#84463f; background:#f3e5e1; }
+.balance-empty,.balance-disclaimer { margin:8px 0 0; color:#8f887c; font-size:9px; line-height:1.4; }
+.balance-disclaimer { margin-top:7px; text-align:center; }
 .evil-win-status { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:10px; margin:0 0 12px; padding:11px; border:1px solid #d4b2aa; background:#f5e8e3; color:#8b3d35; }
 .evil-win-status>svg { width:22px; height:22px; }
 .evil-win-status>div { display:flex; flex-direction:column; gap:1px; }
@@ -305,7 +327,7 @@ button,select { font:inherit; } button { cursor:pointer; }
   .phase-bar{grid-template-columns:minmax(0,1fr) auto;gap:8px;margin:0 0 15px;padding:11px}.phase-bar>button{min-height:42px;height:auto}.phase-bar p small{font-size:11px}.phase-bar p strong{font-size:14px}.log-shortcut{grid-column:1;min-height:40px!important;justify-content:center;border:1px solid #d2c6b5!important;border-radius:6px!important}.reset-game-button{grid-column:2;min-height:40px!important}
   .section-title{margin-top:17px}.section-title p{display:none}.alignment-tabs{height:47px!important;overflow-x:auto;justify-content:flex-start}.alignment-tabs button{min-width:92px;height:37px;font-size:14px}
   .role-grid{grid-template-columns:1fr;gap:8px}.role-card{min-height:0;padding:11px 12px}.role-details{display:none}.role-card.is-expanded .role-details{display:block}.role-details>p{margin:10px 0 0;font-size:14px;line-height:1.62}.role-foot{margin-left:0}.setup,.data-note{font-size:12px;line-height:1.45}.role-expand{width:34px;height:34px;display:grid;place-items:center;flex:none;border:0;border-radius:6px;color:#557174;background:#e7efec}.role-expand svg{width:16px}.lock-button{width:34px;height:34px;flex:none}.timing{font-size:11px}
-  .board-actions button{min-height:42px;height:auto}.bluff-heading small,.bluff-empty,.message,.selected-group p{font-size:12px}.bluff-slot [data-slot="native-select"]{height:42px;font-size:13px}.evil-win-status span,.evil-win-status small{font-size:11px}.selected-group li{font-size:12px}.message{line-height:1.55}
+  .board-actions button{min-height:42px;height:auto}.balance-card{padding:13px}.balance-heading span{font-size:13px}.balance-heading small,.balance-disclaimer,.balance-empty{font-size:11px}.balance-heading>b,.balance-factors b{font-size:12px}.balance-numbers{font-size:14px}.balance-track{height:12px}.balance-factors span{font-size:11px}.bluff-heading small,.bluff-empty,.message,.selected-group p{font-size:12px}.bluff-slot [data-slot="native-select"]{height:42px;font-size:13px}.evil-win-status span,.evil-win-status small{font-size:11px}.selected-group li{font-size:12px}.message{line-height:1.55}
   .view-heading{display:block}.view-heading p{font-size:14px;line-height:1.5}.view-heading>div:last-child{display:flex;gap:8px;margin-top:12px}.view-heading button{min-height:42px}
   .seat-workspace{overflow:visible}.seat-ring{width:calc(100vw - 36px);max-width:520px;margin:10px auto 18px;transform:none}.seat-token{left:var(--seat-left-mobile);top:var(--seat-top-mobile);width:68px;min-height:50px;padding:5px 6px}.seat-token b{font-size:10px}.seat-token>span>i{display:none}.seat-token strong{gap:3px;margin-top:2px;font-size:11px}.seat-token strong .role-icon{width:22px;height:22px}.ring-center{width:104px;height:104px}.ring-center span{font-size:30px}.ring-center b{font-size:10px}.ring-center em{max-width:86px;font-size:9px;text-align:center}
   .seat-editor{grid-template-columns:1fr}.seat-editor-number{grid-column:auto}.seat-editor button{min-height:44px}.seat-status-editor button{min-width:44px;min-height:44px}
