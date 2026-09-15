@@ -167,13 +167,28 @@ function nightStepDetail(step: NightStep, selected: Set<string>, roles: Role[], 
   return isDemonInfo && bluffNames.length ? `${poppyDemonInfo ? '罂粟种植者在场：不告知爪牙。' : step.note} 说书人展示给恶魔：${bluffNames.join('、')}。` : poppyDemonInfo ? '罂粟种植者在场：说书人只向恶魔展示三项伪装，不告知爪牙。' : step.note;
 }
 
+function nightStepSeatLabel(step: NightStep, selected: Set<string>, seats: Seat[], roles: Role[]) {
+  const alignment = step.roleId ? roles.find((role) => role.id === step.roleId)?.alignment : step.requiredAlignment;
+  const expectedRoles = step.roleId
+    ? roles.filter((role) => role.id === step.roleId && selected.has(role.id))
+    : alignment ? roles.filter((role) => role.alignment === alignment && selected.has(role.id)) : [];
+  if (!expectedRoles.length) return null;
+  const roleIds = new Set(expectedRoles.map((role) => role.id));
+  const assigned = seats.filter((seat) => seat.roleId && roleIds.has(seat.roleId));
+  const unassignedCount = Math.max(0,expectedRoles.length - assigned.length);
+  const assignedText = assigned.map((seat) => `${seat.number}号${seat.alive ? '' : '（死亡）'}`).join('、');
+  const missingText = unassignedCount ? expectedRoles.length === 1 ? '未入座' : `${unassignedCount}名未入座` : '';
+  const text = [assignedText,missingText].filter(Boolean).join(' · ');
+  return { text, alignment };
+}
+
 function NightList({ title, steps, selected, seats, roles, bluffs, completed, onToggle }: { title: string; steps: NightStep[]; selected: Set<string>; seats: Seat[]; roles: Role[]; bluffs: (string|null)[]; completed: Set<string>; onToggle: (id: string) => void }) {
   const visible = visibleNightSteps(steps, selected, seats, roles);
   return <section className="night-list">
     <div className="night-list-heading"><div><span className="eyebrow">WAKE ORDER</span><h3>{title}</h3></div><b>{visible.filter((step) => completed.has(step.id)).length} / {visible.length}</b></div>
     <ol>{visible.map((step, index) => {
-      const assignedSeat = step.roleId ? seats.find((seat) => seat.roleId === step.roleId) : undefined;
       const assignedRole = step.roleId ? roles.find((role) => role.id === step.roleId) : undefined;
+      const seatLabel = nightStepSeatLabel(step,selected,seats,roles);
       const demonInfo = nightStepDetail(step, selected, roles, bluffs);
       return <li key={step.id} className={completed.has(step.id) ? 'is-complete' : ''}>
         <span className="night-index">{String(index + 1).padStart(2, '0')}</span>
@@ -181,7 +196,7 @@ function NightList({ title, steps, selected, seats, roles, bluffs, completed, on
         {assignedRole ? <RoleIcon role={assignedRole} className="night-role-icon"/> : <span className="night-role-icon system-icon"><Moon/></span>}
         <button onClick={() => onToggle(step.id)}><strong>{step.name}</strong><small>{demonInfo}</small></button>
         <span className={`phase phase-${step.phase}`}>{step.phase}</span>
-        {assignedRole && <span className={`night-seat night-seat-${assignedRole.alignment}`}>{assignedSeat ? `${assignedSeat.number}号${assignedSeat.alive ? '' : ' · 已死亡'}` : '未入座'}</span>}
+        {seatLabel && <span className={`night-seat ${seatLabel.alignment ? `night-seat-${seatLabel.alignment}` : ''}`}><b>玩家</b>{seatLabel.text}</span>}
       </li>;
     })}</ol>
   </section>;
@@ -192,12 +207,12 @@ function NightFocus({ title, steps, selected, seats, roles, bluffs, completed, o
   const currentIndex = visible.findIndex((step) => !completed.has(step.id));
   const current = currentIndex >= 0 ? visible[currentIndex] : undefined;
   if (!current) return <section className="night-focus night-focus-complete"><Check/><span className="eyebrow">{title}</span><h3>本轮夜序已完成</h3><p>所有需要处理的角色都已标记完成。</p></section>;
-  const assignedSeat = current.roleId ? seats.find((seat) => seat.roleId === current.roleId) : undefined;
   const assignedRole = current.roleId ? roles.find((role) => role.id === current.roleId) : undefined;
+  const seatLabel = nightStepSeatLabel(current,selected,seats,roles);
   const detail = nightStepDetail(current, selected, roles, bluffs);
   return <section className="night-focus">
     <header><span>{String(currentIndex + 1).padStart(2,'0')} / {String(visible.length).padStart(2,'0')}</span><b>{title}</b></header>
-    <div className="night-focus-role">{assignedRole ? <RoleIcon role={assignedRole}/> : <span className="night-focus-system"><Moon/></span>}<div><small>{current.phase}{assignedSeat ? ` · ${assignedSeat.number}号座位` : assignedRole ? ' · 未入座' : ''}</small><h3>{current.name}</h3>{assignedRole && <span>{alignmentMeta[assignedRole.alignment].short}</span>}</div></div>
+    <div className="night-focus-role">{assignedRole ? <RoleIcon role={assignedRole}/> : <span className="night-focus-system"><Moon/></span>}<div><small>{current.phase}</small><h3>{current.name}</h3>{assignedRole && <span>{alignmentMeta[assignedRole.alignment].short}</span>}</div>{seatLabel && <div className={`night-focus-seat ${seatLabel.alignment ? `night-focus-seat-${seatLabel.alignment}` : ''}`}><small>对应玩家</small><strong>{seatLabel.text}</strong></div>}</div>
     {assignedRole && <div className="night-focus-block"><small>角色能力</small><p>{assignedRole.ability}</p></div>}
     <div className="night-focus-block is-action"><small>本步提示</small><p>{detail}</p></div>
     <Button className="night-focus-next" onClick={() => onToggle(current.id)}><Check/>完成并进入下一位<ChevronRight/></Button>
