@@ -262,16 +262,27 @@ button,select { font:inherit; } button { cursor:pointer; }
 .night-list-heading h3 { margin:4px 0 0; font-family:var(--font-display); font-size:21px; }
 .night-list-heading>b { color:#d4b46d; font-size:13px; }
 .night-list ol { list-style:none; margin:0; padding:0; }
-.night-list li { display:grid; grid-template-columns:34px 20px 38px minmax(0,1fr) auto auto; align-items:center; gap:10px; min-height:66px; padding:9px 14px; border-top:1px solid #e0d9cc; }
+.night-list li { position:relative; display:grid; grid-template-columns:34px 20px 38px minmax(0,1fr) auto auto; align-items:center; gap:10px; min-height:66px; padding:9px 14px; border-top:1px solid #e0d9cc; }
 .night-list li:first-child { border-top:0; }
 .night-list li:hover { background:#f7f3e9; }
 .night-index { color:#b29a6c; font-family:var(--font-display); font-size:15px; }
 .night-role-icon { width:34px; height:34px; }
+.night-role-trigger { display:grid; width:38px; height:38px; place-items:center; border-radius:50%; cursor:help; }
+.night-role-trigger:hover { background:#e4ded1; box-shadow:0 0 0 3px #b89a5c35; }
 .system-icon { display:grid; place-items:center; border:1px solid #b7aa95; border-radius:50%; color:#b89a5c; background:#173f45; }
 .system-icon svg { width:15px; }
 .night-list li>button { display:flex; flex-direction:column; align-items:flex-start; gap:3px; border:0; padding:0; text-align:left; background:transparent; }
 .night-list li strong { color:#244e53; font-size:13px; }
 .night-list li small { color:#74756d; font-size:10px; line-height:1.4; }
+.night-list-ability-card { position:absolute; left:102px; top:58px; z-index:40; display:none; width:min(310px,calc(100% - 124px)); padding:12px 13px; border:1px solid #b9a982; border-radius:7px; color:#404946; background:#fffdf7; box-shadow:0 13px 30px #30291f42; text-align:left; pointer-events:none; }
+.night-role-trigger:hover~.night-list-ability-card,.night-step-main:hover~.night-list-ability-card,.night-step-main:focus-visible~.night-list-ability-card { display:block; }
+.night-list-ability-card .seat-ability-heading { display:flex; align-items:center; gap:9px; }
+.night-list-ability-card .seat-ability-heading .role-icon { width:38px; height:38px; }
+.night-list-ability-card .seat-ability-heading span { display:flex; flex-direction:column; gap:2px; }
+.night-list-ability-card .seat-ability-heading b { color:#244e53; font-family:var(--font-display); font-size:15px; }
+.night-list-ability-card .seat-ability-heading small { color:#8a7967; font-size:10px; }
+.night-list-ability-card .seat-ability-text { display:block; margin-top:9px; color:#3e4a48; font-size:12px; line-height:1.65; }
+.night-list-ability-card .seat-ability-setup { display:block; margin-top:7px; color:#876635; font-size:10px; line-height:1.5; }
 .night-list li.is-complete { background:#edf2ed; opacity:.65; }
 .night-list li.is-complete button { text-decoration:line-through; }
 .night-list li.is-impaired { border-left:4px solid #c05043; background:#fff2ee; }

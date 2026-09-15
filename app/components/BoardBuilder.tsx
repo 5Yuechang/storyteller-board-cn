@@ -235,12 +235,17 @@ function NightList({ title, steps, selected, seats, roles, bluffs, completed, ta
       return <li key={step.id} className={`${completed.has(step.id) ? 'is-complete' : ''} ${impaired ? 'is-impaired' : ''}`}>
         <span className="night-index">{String(index + 1).padStart(2, '0')}</span>
         <Checkbox checked={completed.has(step.id)} onCheckedChange={() => onToggle(step.id)} aria-label={`完成${step.name}`}/>
-        {assignedRole ? <RoleIcon role={assignedRole} className="night-role-icon"/> : <span className="night-role-icon system-icon"><Moon/></span>}
-        <button onClick={() => onToggle(step.id)}><strong>{step.name}</strong><small>{demonInfo}</small></button>
+        {assignedRole ? <span className="night-role-trigger"><RoleIcon role={assignedRole} className="night-role-icon"/></span> : <span className="night-role-icon system-icon"><Moon/></span>}
+        <button className="night-step-main" onClick={() => onToggle(step.id)} aria-describedby={assignedRole ? `night-ability-${step.id}` : undefined}><strong>{step.name}</strong><small>{demonInfo}</small></button>
         <span className={`phase phase-${step.phase}`}>{step.phase}</span>
         {seatLabel && <span className={`night-seat ${seatLabel.alignment ? `night-seat-${seatLabel.alignment}` : ''}`}><b>玩家</b>{seatLabel.text}</span>}
         {impaired && <div className="night-impairment"><AlertTriangle/> {actorSeat?.number}号已{actorSeat?.statuses.includes('poisoned') ? '中毒' : '醉酒'}：照常唤醒并记录选择，但能力无效</div>}
         <NightTargetPicker step={step} selected={selected} seats={seats} roles={roles} targets={targets[step.id] ?? []} onChange={(index,seatNumber) => onTargetChange(step,index,seatNumber)}/>
+        {assignedRole && <span id={`night-ability-${step.id}`} role="tooltip" className="night-list-ability-card">
+          <span className="seat-ability-heading"><RoleIcon role={assignedRole}/><span><b>{assignedRole.name}</b><small>{alignmentMeta[assignedRole.alignment].short} · {assignedRole.timing ?? '被动'}</small></span></span>
+          <span className="seat-ability-text">{assignedRole.ability}</span>
+          {assignedRole.setup && <span className="seat-ability-setup">配置：{assignedRole.setup}</span>}
+        </span>}
       </li>;
     })}</ol>
   </section>;
