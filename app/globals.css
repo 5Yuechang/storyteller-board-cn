@@ -181,15 +181,17 @@ button,select { font:inherit; } button { cursor:pointer; }
 .ring-center em { margin-top:4px; color:#e6c78a; font-size:9px; font-style:normal; font-weight:800; }
 .ring-center.is-good-win { background:#285f49; box-shadow:0 0 0 7px #1c493a88; }
 .ring-center.is-good-win em { color:#d9f0df; }
-.seat-token { position:absolute; left:var(--seat-left); top:var(--seat-top); width:100px; min-height:57px; z-index:3; transform:translate(-50%,-50%); border:1px solid #b6aa98; border-radius:8px; padding:7px 8px; text-align:left; color:#435052; background:#fffdf8; box-shadow:0 5px 13px #564d4028; transition:.17s; }
+.seat-token { position:absolute; left:var(--seat-left); top:var(--seat-top); width:100px; min-height:57px; z-index:3; transform:translate(calc(-50% + var(--drag-x,0px)),calc(-50% + var(--drag-y,0px))); border:1px solid #b6aa98; border-radius:8px; padding:7px 8px; text-align:left; color:#435052; background:#fffdf8; box-shadow:0 5px 13px #564d4028; transition:transform .17s,border-color .17s,box-shadow .17s,opacity .17s; cursor:grab; touch-action:none; user-select:none; }
 .seat-token.seat-townsfolk,.seat-token.seat-outsider { border-color:#6b9dbd; color:#174e72; background:linear-gradient(145deg,#f5fbff 0%,#dceef9 100%); box-shadow:inset 3px 0 0 #3e83b3,0 5px 13px #335f7a2b; }
 .seat-token.seat-outsider { border-color:#7f9fbd; background:linear-gradient(145deg,#f2f8fd 0%,#d6e5f1 100%); box-shadow:inset 3px 0 0 #6487a8,0 5px 13px #335f7a2b; }
 .seat-token.seat-minion,.seat-token.seat-demon { border-color:#bb746a; color:#772f29; background:linear-gradient(145deg,#fff7f4 0%,#f3dcd6 100%); box-shadow:inset 3px 0 0 #b44e43,0 5px 13px #783d352b; }
 .seat-token.seat-demon { border-color:#a8564d; background:linear-gradient(145deg,#fff2ee 0%,#edcbc4 100%); box-shadow:inset 4px 0 0 #923b32,0 5px 13px #783d3538; }
 .seat-token.seat-side-good { border-color:#6b9dbd; color:#174e72; background:linear-gradient(145deg,#f5fbff 0%,#dceef9 100%); box-shadow:inset 3px 0 0 #3e83b3,0 5px 13px #335f7a2b; }
 .seat-token.seat-side-evil { border-color:#b45e54; color:#772f29; background:linear-gradient(145deg,#fff5f1 0%,#efd4ce 100%); box-shadow:inset 4px 0 0 #9e4137,0 5px 13px #783d3538; }
-.seat-token:hover { z-index:5; transform:translate(-50%,-50%) scale(1.04); }
+.seat-token:hover { z-index:5; transform:translate(calc(-50% + var(--drag-x,0px)),calc(-50% + var(--drag-y,0px))) scale(1.04); }
 .seat-token.is-active { z-index:5; outline:3px solid #bd943d88; border-color:#987226; box-shadow:0 8px 19px #4d423344; }
+.seat-token.is-dragging { z-index:20; opacity:.88; cursor:grabbing; transform:translate(calc(-50% + var(--drag-x,0px)),calc(-50% + var(--drag-y,0px))) scale(1.08); box-shadow:0 14px 28px #32291f55; transition:none; }
+.seat-token.is-drop-target { z-index:10; outline:4px solid #d4a23f99; border-color:#a6761f; transform:translate(-50%,-50%) scale(1.08); box-shadow:0 0 0 7px #e5bd692d,0 8px 20px #4d423344; }
 .seat-token>span { display:flex; align-items:center; justify-content:space-between; gap:4px; }
 .seat-token b { color:currentColor; opacity:.72; font-size:10px; }
 .seat-token i { color:#347055; font-size:9px; font-style:normal; font-weight:800; }

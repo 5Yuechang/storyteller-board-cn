@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
 import { AlertTriangle, BellRing, BookOpen, Check, ChevronDown, ChevronRight, ChevronUp, CircleHelp, Dice5, EyeOff, Gauge, LayoutGrid, Lightbulb, List, Lock, Maximize2, Moon, Play, Plus, RotateCcw, ShieldCheck, Shuffle, Skull, Sparkles, Sunrise, Trash2, UserRound, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -69,11 +69,38 @@ function RoleCard({ role, selected, locked, onSelect, onLock }: { role: Role; se
   </article>;
 }
 
-function SeatMap({ seats, roles, activeSeat, onSelect }: { seats: Seat[]; roles: Role[]; activeSeat: number; onSelect: (number: number) => void }) {
+function SeatMap({ seats, roles, activeSeat, onSelect, onSwap }: { seats: Seat[]; roles: Role[]; activeSeat: number; onSelect: (number: number) => void; onSwap: (from: number, to: number) => void }) {
+  const [draggingSeat, setDraggingSeat] = useState<number|null>(null);
+  const [dragTarget, setDragTarget] = useState<number|null>(null);
+  const [dragOffset, setDragOffset] = useState({ x:0, y:0 });
+  const dragStart = useRef({ x:0, y:0 });
+  const didDrag = useRef(false);
   const aliveCount = seats.filter((seat) => seat.alive).length;
   const deathsUntilEvilWin = Math.max(0, aliveCount - 2);
   const demonSeats = seats.filter((seat) => roles.find((role) => role.id === seat.roleId)?.alignment === 'demon');
   const demonDefeated = demonSeats.length > 0 && demonSeats.every((seat) => !seat.alive);
+  const beginDrag = (event: ReactPointerEvent<HTMLButtonElement>, seatNumber: number) => {
+    if (event.button !== 0) return;
+    dragStart.current = { x:event.clientX, y:event.clientY };
+    didDrag.current = false;
+    setDraggingSeat(seatNumber); setDragTarget(null); setDragOffset({ x:0, y:0 });
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+  const moveDrag = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (draggingSeat === null) return;
+    const offset = { x:event.clientX - dragStart.current.x, y:event.clientY - dragStart.current.y };
+    if (Math.hypot(offset.x,offset.y) < 7 && !didDrag.current) return;
+    didDrag.current = true; setDragOffset(offset);
+    const targetNumber = document.elementsFromPoint(event.clientX,event.clientY).map((element) => Number(element.closest<HTMLElement>('[data-seat-number]')?.dataset.seatNumber)).find((number) => Number.isFinite(number) && number !== draggingSeat);
+    setDragTarget(targetNumber ?? null);
+  };
+  const finishDrag = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (draggingSeat === null) return;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    const targetNumber = document.elementsFromPoint(event.clientX,event.clientY).map((element) => Number(element.closest<HTMLElement>('[data-seat-number]')?.dataset.seatNumber)).find((number) => Number.isFinite(number) && number !== draggingSeat);
+    if (didDrag.current && targetNumber !== undefined) onSwap(draggingSeat,targetNumber);
+    setDraggingSeat(null); setDragTarget(null); setDragOffset({ x:0, y:0 });
+  };
   return <div className="seat-ring" aria-label={`${seats.length}人环形座位图`}>
     <div className="ring-lines" aria-hidden="true"><span/><span/><span/></div>
     <div className={`ring-center ${demonDefeated ? 'is-good-win' : ''}`}><span>{aliveCount}</span><small>存活</small><b>{seats.length} 人魔典</b><em>{demonDefeated ? '恶魔死亡 · 善良胜利' : deathsUntilEvilWin ? `再死亡 ${deathsUntilEvilWin} 人` : '已到邪恶胜利线'}</em></div>
@@ -83,14 +110,21 @@ function SeatMap({ seats, roles, activeSeat, onSelect }: { seats: Seat[]; roles:
       const side = seat.statuses.includes('turnedEvil') ? 'evil' : seat.statuses.includes('turnedGood') ? 'good' : role && (role.alignment === 'minion' || role.alignment === 'demon') ? 'evil' : role ? 'good' : '';
       return <button
         key={seat.number}
-        className={`seat-token ${role ? `seat-${role.alignment}` : ''} ${side ? `seat-side-${side}` : ''} ${seat.alive ? 'is-alive' : 'is-dead'} ${activeSeat === seat.number ? 'is-active' : ''}`}
+        data-seat-number={seat.number}
+        className={`seat-token ${role ? `seat-${role.alignment}` : ''} ${side ? `seat-side-${side}` : ''} ${seat.alive ? 'is-alive' : 'is-dead'} ${activeSeat === seat.number ? 'is-active' : ''} ${draggingSeat === seat.number ? 'is-dragging' : ''} ${dragTarget === seat.number ? 'is-drop-target' : ''}`}
         style={{
           '--seat-left': `${50 + Math.sin(angle) * 43}%`,
           '--seat-top': `${50 - Math.cos(angle) * 43}%`,
           '--seat-left-mobile': `${50 + Math.sin(angle) * 38}%`,
           '--seat-top-mobile': `${50 - Math.cos(angle) * 38}%`,
+          '--drag-x': draggingSeat === seat.number ? `${dragOffset.x}px` : '0px',
+          '--drag-y': draggingSeat === seat.number ? `${dragOffset.y}px` : '0px',
         } as CSSProperties}
-        onClick={() => onSelect(seat.number)}
+        onPointerDown={(event) => beginDrag(event,seat.number)}
+        onPointerMove={moveDrag}
+        onPointerUp={finishDrag}
+        onPointerCancel={() => { setDraggingSeat(null); setDragTarget(null); setDragOffset({ x:0, y:0 }); didDrag.current = false; }}
+        onClick={() => { if (didDrag.current) { didDrag.current = false; return; } onSelect(seat.number); }}
         aria-label={`${seat.number}号，${role?.name ?? '未分配'}，${seat.alive ? '存活' : '死亡'}`}
       >
         <span><b>{seat.number}号</b><i>{seat.alive ? '存活' : '死亡'}</i></span>
@@ -342,6 +376,19 @@ export default function BoardBuilder() {
     const roles = shuffled(selectedRoles);
     setSeats((current) => current.map((seat, index) => ({ ...seat, roleId:roles[index]?.id ?? null, alive:true, statuses:[] })));
   }
+  function swapSeats(from: number, to: number) {
+    if (from === to) return;
+    const fromSeat = seats.find((seat) => seat.number === from);
+    const toSeat = seats.find((seat) => seat.number === to);
+    if (!fromSeat || !toSeat) return;
+    setSeats((current) => current.map((seat) => seat.number === from ? { ...toSeat, number:from } : seat.number === to ? { ...fromSeat, number:to } : seat));
+    setActiveSeat(to);
+    if (gameStarted) {
+      const fromRole = script.roles.find((role) => role.id === fromSeat.roleId)?.name ?? '未分配';
+      const toRole = script.roles.find((role) => role.id === toSeat.roleId)?.name ?? '未分配';
+      addLog('role',`${from}号与${to}号交换座位`,`${fromRole} ↔ ${toRole}`);
+    }
+  }
   function toggleSeatStatus(seatNumber: number, status: SeatStatus) {
     const target = seats.find((seat) => seat.number === seatNumber);
     const adding = !target?.statuses.includes(status);
@@ -442,8 +489,8 @@ export default function BoardBuilder() {
         </Tabs>}
 
         {view === 'seats' && <section className="seat-workspace">
-          <div className="view-heading"><div><span className="eyebrow">GRIMOIRE SEATS</span><h3>环形座位魔典</h3><p>点选座位，在下方分配身份并切换存活状态。</p></div><div><Button onClick={randomizeSeats} disabled={!selectedRoles.length}><Shuffle/>随机入座</Button><Button variant="outline" onClick={() => setSeats(makeSeats(playerCount))}><RotateCcw/>清空座位</Button></div></div>
-          <SeatMap seats={seats} roles={script.roles} activeSeat={activeSeat} onSelect={setActiveSeat}/>
+          <div className="view-heading"><div><span className="eyebrow">GRIMOIRE SEATS</span><h3>环形座位魔典</h3><p>点击座位进行编辑；按住并拖到另一个座位可交换双方全部状态。</p></div><div><Button onClick={randomizeSeats} disabled={!selectedRoles.length}><Shuffle/>随机入座</Button><Button variant="outline" onClick={() => setSeats(makeSeats(playerCount))}><RotateCcw/>清空座位</Button></div></div>
+          <SeatMap seats={seats} roles={script.roles} activeSeat={activeSeat} onSelect={setActiveSeat} onSwap={swapSeats}/>
           <div className="seat-editor">
             <div className="seat-editor-number"><span>{activeSeatState.number}</span><div><b>{activeSeatState.number}号座位</b><small>{activeSeatState.alive ? '当前存活' : '当前死亡'}</small></div></div>
             <label><span>身份</span><NativeSelect value={activeSeatState.roleId ?? ''} onChange={(event) => assignRole(activeSeatState.number, event.target.value || null)} aria-label={`${activeSeatState.number}号身份`}><NativeSelectOption value="">未分配身份</NativeSelectOption>{alignments.map((alignment) => <optgroup key={alignment} label={alignmentMeta[alignment].short}>{selectedRoles.filter((role) => role.alignment === alignment).map((role) => <NativeSelectOption key={role.id} value={role.id}>{role.name}</NativeSelectOption>)}</optgroup>)}</NativeSelect></label>
