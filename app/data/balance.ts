@@ -24,6 +24,14 @@ const roleAdjustments: Record<string, RoleAdjustment> = {
   'fortune-teller': { value: 0.45, reason: '持续恶魔定位信息' },
   balloonist: { value: 0.35, reason: '持续角色类型信息' },
   dreamer: { value: 0.35, reason: '持续身份二选一信息' },
+  clockmaker: { value: 0.25, reason: '首夜提供邪恶座位距离' },
+  mathematician: { value: 0.2, reason: '追踪能力异常次数' },
+  flowergirl: { value: 0.25, reason: '持续追踪恶魔投票' },
+  'town-crier': { value: 0.25, reason: '持续追踪爪牙提名' },
+  oracle: { value: 0.2, reason: '持续统计死亡邪恶' },
+  juggler: { value: 0.2, reason: '首日可获取多项角色验证' },
+  seamstress: { value: 0.25, reason: '一次验证两人阵营关系' },
+  artist: { value: 0.25, reason: '一次自由是非信息' },
   professor: { value: 0.45, reason: '可复活镇民' },
   philosopher: { value: 0.35, reason: '可复制关键善良能力' },
   engineer: { value: 0.35, reason: '可控制邪恶角色构成' },
@@ -43,6 +51,10 @@ const roleAdjustments: Record<string, RoleAdjustment> = {
   godfather: { value: -0.25, reason: '外来者死亡可额外击杀' },
   vigormortis: { value: -0.35, reason: '保留爪牙能力并使镇民中毒' },
   'fang-gu': { value: -0.3, reason: '可转化外来者并转移恶魔' },
+  witch: { value: -0.3, reason: '诅咒提名并压制白天行动' },
+  'evil-twin': { value: -0.4, reason: '限制善良胜利并制造处决风险' },
+  'no-dashii': { value: -0.45, reason: '持续使相邻镇民中毒' },
+  vortox: { value: -0.5, reason: '强制镇民错误信息与每日处决' },
   'hadi-jiya': { value: -0.25, reason: '多人抉择带来群体死亡压力' },
   'black-sun': { value: -0.25, reason: '多人死亡与隐藏决策压力' },
 };
@@ -66,4 +78,3 @@ export function evaluateBoardBalance(roles: Role[]): BoardBalance {
 
   return { blue, red, tendency, label, factors };
 }
-

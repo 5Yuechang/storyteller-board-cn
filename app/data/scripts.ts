@@ -1,5 +1,5 @@
 export type Alignment = 'townsfolk' | 'outsider' | 'minion' | 'demon';
-export type Role = { id: string; name: string; alignment: Alignment; ability: string; timing?: '首夜' | '每夜' | '每夜*' | '白天' | '被动' | '一次'; setup?: string; note?: string; misinformation?: string[] };
+export type Role = { id: string; name: string; alignment: Alignment; ability: string; glyph?: string; timing?: '首夜' | '每夜' | '每夜*' | '白天' | '被动' | '一次'; setup?: string; note?: string; misinformation?: string[] };
 export type PlayerCount = Record<Alignment, number>;
 export type NightStep = { id: string; name: string; note: string; roleId?: string; phase?: '信息'|'行动'|'结算'; deadMode?: 'show'|'only'; requiredAlignment?: Alignment; skipWhenRolePresent?: string };
 export type ScriptDefinition = { id: string; name: string; author: string; playerRange: [number, number]; description: string; counts: Record<number, PlayerCount>; roles: Role[]; specialRules?: { name:string; description:string }[]; nightOrder: { first: NightStep[]; other: NightStep[] } };
@@ -205,6 +205,76 @@ export const scripts: ScriptDefinition[] = [{
       {id:'barber-other',name:'理发师',note:'若理发师死亡，恶魔可选择两名非其他恶魔玩家交换角色。',roleId:'barber',phase:'行动',deadMode:'only'},
       {id:'farmer-other',name:'农夫',note:'若今夜死亡，使一名存活善良玩家变成农夫。',roleId:'farmer',phase:'结算',deadMode:'only'},
       {id:'balloonist-mo-other',name:'气球驾驶员',note:'展示一名与上次角色类型不同的玩家。',roleId:'balloonist',phase:'信息'},
+    ]
+  }
+}, {
+  id:'sects-and-violets', name:'梦殒春宵', author:'官方剧本', playerRange:[7,15],
+  description:'信息密集、身份与阵营变化频繁，并以疯狂、中毒和错误信息制造多重世界。', counts:standardCounts,
+  specialRules:[
+    {name:'方古',description:'初始设置时外来者 +1、镇民 -1；整局首次杀死外来者时会转移恶魔身份。'},
+    {name:'亡骨魔',description:'初始设置时外来者 -1、镇民 +1；被其杀死的爪牙保留能力，并使邻近镇民中毒。'},
+    {name:'涡流',description:'所有镇民能力必须产生错误信息；若白天无人被处决，邪恶阵营立即获胜。'},
+  ],
+  roles:[
+    {id:'clockmaker',name:'钟表匠',glyph:'🕰️',alignment:'townsfolk',timing:'首夜',ability:'在你的首个夜晚，你会得知恶魔与爪牙之间最近的距离（邻座距离为 1）。',misinformation:['把真实距离增加或减少 1，保留可推理空间。','给出一个能把善良玩家错误串入邪恶座位链的距离。']},
+    {id:'dreamer',name:'筑梦师',alignment:'townsfolk',timing:'每夜',ability:'每个夜晚，你要选择除你及旅行者以外的一名玩家：你会得知一个善良角色和一个邪恶角色，该玩家是其中一个角色。',misinformation:['展示两个都不是目标的角色。','保留目标真实阵营，但展示错误的具体角色。']},
+    {id:'snake-charmer',name:'舞蛇人',alignment:'townsfolk',timing:'每夜',ability:'每个夜晚，你要选择一名存活的玩家：如果你选中了恶魔，你和他交换角色和阵营，随后他中毒。'},
+    {id:'mathematician',name:'数学家',glyph:'∑',alignment:'townsfolk',timing:'每夜',ability:'每个夜晚，你会得知有多少名玩家的能力因为其他角色的能力而未正常生效（从上个黎明后开始计算）。',misinformation:['把异常人数上下偏移 1。','在实际为 0 时给出非零数字，制造隐藏中毒世界。']},
+    {id:'flowergirl',name:'卖花女孩',glyph:'🌼',alignment:'townsfolk',timing:'每夜*',ability:'每个夜晚*，你会得知今天白天恶魔是否投过票。',misinformation:['恶魔投过票时给出“否”。','恶魔没有投票时给出“是”。']},
+    {id:'town-crier',name:'城镇公告员',glyph:'📣',alignment:'townsfolk',timing:'每夜*',ability:'每个夜晚*，你会得知今天白天是否有爪牙发起过提名。',misinformation:['有爪牙提名时给出“否”。','没有爪牙提名时给出“是”。']},
+    {id:'oracle',name:'神谕者',glyph:'👁️',alignment:'townsfolk',timing:'每夜*',ability:'每个夜晚*，你会得知有多少名死亡玩家是邪恶的。',misinformation:['把死亡邪恶人数上下偏移 1。','延迟体现刚死亡的邪恶玩家，制造时间差。']},
+    {id:'juggler',name:'杂耍艺人',glyph:'🤹',alignment:'townsfolk',timing:'一次',ability:'在你的首个白天，你可以公开猜测至多五名玩家的角色；当晚你会得知猜对了多少个。',misinformation:['把猜中数量上下偏移 1。','给出能支持某个错误身份链的数字。']},
+    {id:'savant',name:'博学者',alignment:'townsfolk',timing:'白天',ability:'每个白天，你可以私下询问说书人以得知两条信息：一个是正确的，一个是错误的。',misinformation:['给出两条都为真但看似冲突的信息。','给出两条都为假、却共同支持一个错误世界的信息。']},
+    {id:'seamstress',name:'女裁缝',glyph:'✂️',alignment:'townsfolk',timing:'一次',ability:'每局游戏限一次，在夜晚时，你可以选择除你以外的两名玩家：你会得知他们是否为同一阵营。',misinformation:['同阵营时给出“否”。','不同阵营时给出“是”。']},
+    {id:'philosopher',name:'哲学家',alignment:'townsfolk',timing:'一次',ability:'每局游戏限一次，在夜晚时，你可以选择一个善良角色：你获得该角色的能力。如果这个角色在场，他醉酒。'},
+    {id:'artist',name:'艺术家',glyph:'🖌️',alignment:'townsfolk',timing:'一次',ability:'每局游戏限一次，在白天时，你可以私下询问说书人一个是非题，并得到“是”“不是”或“不知道”的回答。',misinformation:['对可验证的是非题给出相反回答。','用“不知道”隐藏一个本可确定的答案。']},
+    {id:'sage',name:'贤者',glyph:'🕯️',alignment:'townsfolk',timing:'被动',ability:'如果恶魔杀死了你，当晚你会被唤醒并得知两名玩家，其中一名是杀死你的那个恶魔。',misinformation:['展示两名都不是恶魔的玩家。','保留一名真实恶魔，但加入更可信的善良玩家作为错误候选。']},
+
+    {id:'mutant',name:'畸形秀演员',alignment:'outsider',timing:'被动',ability:'如果你“疯狂”地证明自己是外来者，你可能被处决。'},
+    {id:'barber',name:'理发师',alignment:'outsider',timing:'被动',ability:'如果你死亡，在当晚恶魔可以选择两名玩家（不能选择其他恶魔）交换角色。'},
+    {id:'sweetheart',name:'心上人',alignment:'outsider',timing:'被动',ability:'当你死亡时，会有一名玩家开始醉酒。'},
+    {id:'klutz',name:'呆瓜',glyph:'👞',alignment:'outsider',timing:'被动',ability:'当你得知你已死亡时，你必须公开选择一名存活玩家：如果他属于邪恶阵营，你的阵营落败。'},
+
+    {id:'witch',name:'女巫',glyph:'🧙‍♀️',alignment:'minion',timing:'每夜',ability:'每个夜晚，你要选择一名玩家：如果他明天白天发起提名，他死亡。如果存活玩家只有三名，你失去此能力。'},
+    {id:'cerenovus',name:'洗脑师',alignment:'minion',timing:'每夜',ability:'每个夜晚，你要选择一名玩家和一个善良角色。他明天白天和夜晚需要“疯狂”地证明自己是这个角色，否则他可能被处决。'},
+    {id:'pit-hag',name:'麻脸巫婆',alignment:'minion',timing:'每夜*',ability:'每个夜晚*，你要选择一名玩家和一个角色：如果该角色不在场，他变成该角色。如果因此创造了一个恶魔，当晚的死亡由说书人决定。'},
+    {id:'evil-twin',name:'镜像双子',glyph:'🎭',alignment:'minion',timing:'首夜',ability:'你与一名对立阵营的玩家互相知道对方是什么角色。如果善良双子被处决，邪恶阵营获胜；如果你们都存活，善良阵营无法获胜。'},
+
+    {id:'fang-gu',name:'方古',alignment:'demon',timing:'每夜*',ability:'每个夜晚*，你要选择一名玩家：他死亡。首次用此能力杀死外来者时，他转为邪恶方古且你代替他死亡。',setup:'+1 外来者'},
+    {id:'vigormortis',name:'亡骨魔',alignment:'demon',timing:'每夜*',ability:'每个夜晚*，你要选择一名玩家：他死亡。被该能力杀死的爪牙保留能力，且与他邻近的两名镇民之一中毒。',setup:'-1 外来者'},
+    {id:'no-dashii',name:'诺-达鲺',glyph:'🐙',alignment:'demon',timing:'每夜*',ability:'每个夜晚*，你要选择一名玩家：他死亡。与你邻近的两名镇民中毒。'},
+    {id:'vortox',name:'涡流',glyph:'🌪️',alignment:'demon',timing:'每夜*',ability:'每个夜晚*，你要选择一名玩家：他死亡。镇民玩家的能力都会产生错误信息。如果白天无人被处决，邪恶阵营获胜。'},
+  ],
+  nightOrder:{
+    first:[
+      {id:'sv-philosopher-first',name:'哲学家',note:'若发动能力，选择一个善良角色；若该角色在场，使其醉酒。',roleId:'philosopher',phase:'行动'},
+      {id:'sv-minion-info',name:'爪牙信息',note:'唤醒爪牙，让其互认并确认恶魔。',phase:'信息',requiredAlignment:'minion'},
+      {id:'sv-demon-info',name:'恶魔信息',note:'确认爪牙并展示三项不在场的善良角色。',phase:'信息',requiredAlignment:'demon'},
+      {id:'sv-evil-twin-first',name:'镜像双子',note:'选择一名对立阵营玩家成为善良双子，让双方互相确认角色。',roleId:'evil-twin',phase:'行动'},
+      {id:'sv-witch-first',name:'女巫',note:'选择一名玩家并标记诅咒；若明天由其提名，立即死亡。',roleId:'witch',phase:'行动'},
+      {id:'sv-cerenovus-first',name:'洗脑师',note:'选择一名玩家与一个善良角色，记录疯狂要求。',roleId:'cerenovus',phase:'行动'},
+      {id:'sv-snake-first',name:'舞蛇人',note:'选择一名存活玩家，检查是否与恶魔交换。',roleId:'snake-charmer',phase:'行动'},
+      {id:'sv-seamstress-first',name:'女裁缝',note:'若发动能力，选择两名其他玩家并告知是否同阵营。',roleId:'seamstress',phase:'信息'},
+      {id:'sv-clockmaker-first',name:'钟表匠',note:'告知恶魔到最近爪牙的距离，邻座为 1。',roleId:'clockmaker',phase:'信息'},
+      {id:'sv-dreamer-first',name:'筑梦师',note:'选择一名玩家，展示一个善良角色和一个邪恶角色。',roleId:'dreamer',phase:'信息'},
+      {id:'sv-mathematician-first',name:'数学家',note:'告知从开局起因其他角色能力而异常运作的玩家人数。',roleId:'mathematician',phase:'信息'},
+    ],
+    other:[
+      {id:'sv-philosopher-other',name:'哲学家',note:'若尚未发动，可选择一个善良角色获得其能力。',roleId:'philosopher',phase:'行动'},
+      {id:'sv-witch-other',name:'女巫',note:'选择一名玩家并更新诅咒目标；三人生还时失去能力。',roleId:'witch',phase:'行动'},
+      {id:'sv-cerenovus-other',name:'洗脑师',note:'选择一名玩家与一个善良角色，更新疯狂要求。',roleId:'cerenovus',phase:'行动'},
+      {id:'sv-pit-hag-other',name:'麻脸巫婆',note:'选择玩家与角色，处理角色变化和可能的任意死亡。',roleId:'pit-hag',phase:'行动'},
+      {id:'sv-snake-other',name:'舞蛇人',note:'选择一名存活玩家，检查是否与恶魔交换。',roleId:'snake-charmer',phase:'行动'},
+      {id:'sv-demon-other',name:'恶魔行动',note:'选择一名玩家死亡，并处理方古转化、亡骨魔中毒或诺-达鲺邻座中毒。',phase:'行动',requiredAlignment:'demon'},
+      {id:'sv-barber-other',name:'理发师',note:'若理发师死亡，恶魔可选择两名非其他恶魔玩家交换角色。',roleId:'barber',phase:'行动',deadMode:'only'},
+      {id:'sv-sage-other',name:'贤者',note:'若今夜被恶魔杀死，展示两名玩家，其中一名是恶魔。',roleId:'sage',phase:'信息',deadMode:'only'},
+      {id:'sv-seamstress-other',name:'女裁缝',note:'若尚未发动，可选择两名其他玩家并得知是否同阵营。',roleId:'seamstress',phase:'信息'},
+      {id:'sv-juggler-other',name:'杂耍艺人',note:'首个白天进行过猜测时，告知其猜对的角色数量。',roleId:'juggler',phase:'信息'},
+      {id:'sv-flowergirl-other',name:'卖花女孩',note:'告知今天白天恶魔是否投过票。',roleId:'flowergirl',phase:'信息'},
+      {id:'sv-town-crier-other',name:'城镇公告员',note:'告知今天白天是否有爪牙发起过提名。',roleId:'town-crier',phase:'信息'},
+      {id:'sv-oracle-other',name:'神谕者',note:'告知当前死亡玩家中邪恶玩家的数量。',roleId:'oracle',phase:'信息'},
+      {id:'sv-dreamer-other',name:'筑梦师',note:'选择一名玩家，展示一个善良角色和一个邪恶角色。',roleId:'dreamer',phase:'信息'},
+      {id:'sv-mathematician-other',name:'数学家',note:'告知从上个黎明后因其他角色能力而异常运作的玩家人数。',roleId:'mathematician',phase:'信息'},
     ]
   }
 }];

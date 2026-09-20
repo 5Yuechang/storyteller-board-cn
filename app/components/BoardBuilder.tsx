@@ -38,15 +38,23 @@ const nightTargetCounts: Record<string,number> = {
   dreamer:1, gambler:1, ravenkeeper:1, cerenovus:1, 'pit-hag':1, godfather:1, lunatic:1,
   noble:3, innkeeper:2, investigator:2, grandmother:1, 'fortune-teller':2, barber:2, farmer:1,
   'toy-maker':3, 'trolley-problem':3, 'black-sun':3, 'hadi-jiya':3,
+  seamstress:2, witch:1, 'evil-twin':1, sage:2, 'no-dashii':1, vortox:1,
   imp:1, vigormortis:1, 'fang-gu':1,
 };
 
 const makeSeats = (count: number): Seat[] => Array.from({ length: count }, (_, index) => ({ number: index + 1, roleId: null, alive: true, statuses: [] }));
-const withBalloonistSetup = (quota: Record<Alignment, number>, enabled: boolean): Record<Alignment, number> => enabled ? {
-  ...quota,
-  townsfolk: Math.max(0, quota.townsfolk - 1),
-  outsider: quota.outsider + 1,
-} : quota;
+const setupRoleIds = new Set(['balloonist','fang-gu','vigormortis']);
+const setupModifiers = (roleIds: Set<string>) => [
+  roleIds.has('balloonist') ? { id:'balloonist', label:'气球驾驶员：镇民 −1 · 外来者 +1', outsiderDelta:1 } : null,
+  roleIds.has('fang-gu') ? { id:'fang-gu', label:'方古：镇民 −1 · 外来者 +1', outsiderDelta:1 } : null,
+  roleIds.has('vigormortis') ? { id:'vigormortis', label:'亡骨魔：镇民 +1 · 外来者 −1', outsiderDelta:-1 } : null,
+].filter((item): item is { id:string; label:string; outsiderDelta:number } => Boolean(item));
+const withSetupAdjustments = (quota: Record<Alignment, number>, roleIds: Set<string>): Record<Alignment, number> => {
+  const requestedDelta = setupModifiers(roleIds).reduce((total,item) => total + item.outsiderDelta,0);
+  const outsider = Math.max(0,quota.outsider + requestedDelta);
+  const appliedDelta = outsider - quota.outsider;
+  return { ...quota, townsfolk:Math.max(0,quota.townsfolk - appliedDelta), outsider };
+};
 const shuffled = <T,>(items: T[]) => {
   const result = [...items];
   for (let index = result.length - 1; index > 0; index -= 1) {
@@ -57,6 +65,7 @@ const shuffled = <T,>(items: T[]) => {
 };
 
 function RoleIcon({ role, className = '' }: { role: Role; className?: string }) {
+  if (role.glyph) return <span className={`role-icon role-glyph ${className}`} aria-hidden="true">{role.glyph}</span>;
   return <img className={`role-icon ${className}`} src={`/roles/${role.id}.webp`} alt="" aria-hidden="true"/>;
 }
 
@@ -296,8 +305,8 @@ export default function BoardBuilder() {
   const [mobileBoardOpen, setMobileBoardOpen] = useState(false);
   const script = scripts.find((item) => item.id === scriptId) ?? scripts[0];
   const baseQuota = script.counts[playerCount];
-  const balloonistSetupActive = selected.has('balloonist');
-  const quota = useMemo(() => withBalloonistSetup(baseQuota, balloonistSetupActive), [baseQuota, balloonistSetupActive]);
+  const activeSetupModifiers = useMemo(() => setupModifiers(selected), [selected]);
+  const quota = useMemo(() => withSetupAdjustments(baseQuota, selected), [baseQuota, selected]);
   const selectedRoles = script.roles.filter((role) => selected.has(role.id));
   const boardBalance = useMemo(() => evaluateBoardBalance(selectedRoles), [selectedRoles]);
   const attentionRoles = selectedRoles.flatMap((role) => (specialAttention[role.id] ?? []).map((item) => ({ role, item })));
@@ -320,6 +329,10 @@ export default function BoardBuilder() {
     }
     return marks;
   }, [abilityTargets,script.nightOrder.first,script.nightOrder.other]);
+
+  useEffect(() => {
+    document.title = `说书人配板台 · ${script.name}`;
+  }, [script.name]);
 
   useEffect(() => {
     let cancelled = false;
@@ -388,15 +401,15 @@ export default function BoardBuilder() {
     result.push(!mismatches.length ? { type:'ok', text:'阵营名额已配齐，可以进入座位安排。' } : { type:'info', text:`还需调整：${mismatches.map((alignment) => `${alignmentMeta[alignment].short} ${totals[alignment]}/${quota[alignment]}`).join('、')}` });
     if (selected.has('damsel') && !selected.has('huntsman')) result.push({ type:'warn', text:'落难少女在场但没有巡山人；确认这是你想要的配置。' });
     if (selected.has('atheist') && selectedRoles.some((role) => role.alignment === 'minion' || role.alignment === 'demon')) result.push({ type:'warn', text:'无神论者要求没有邪恶角色在场，与当前选择冲突。' });
-    if (selected.has('balloonist')) result.push({ type:'ok', text:'已应用气球驾驶员配置：镇民 -1，外来者 +1。' });
+    activeSetupModifiers.forEach((modifier) => result.push({ type:'ok', text:`已应用${modifier.label.replace('：','配置：')}。` }));
     if (selected.has('marionette')) result.push({ type:'info', text:'提线木偶需要与恶魔邻座，安排座位时请检查。' });
     if (selected.has('godfather')) result.push({ type:'info', text:'教父会让外来者数量 -1 或 +1；请按本局决定手动调整配板。' });
-    if (selected.has('vigormortis')) result.push({ type:'info', text:'亡骨魔配置通常为外来者 -1、镇民 +1；请检查最终名额。' });
-    if (selected.has('fang-gu')) result.push({ type:'info', text:'方古配置通常为外来者 +1、镇民 -1；请检查最终名额。' });
+    if (selected.has('vortox')) result.push({ type:'warn', text:'涡流在场：所有镇民信息必须错误，而且每天必须有人被处决。' });
+    if (selected.has('no-dashii')) result.push({ type:'info', text:'诺-达鲺在场：安排或换位后，重新检查其两侧最近的镇民并标记中毒。' });
     const assignedCount = seats.filter((seat) => seat.roleId).length;
     if (assignedCount && assignedCount < playerCount) result.push({ type:'info', text:`座位身份已分配 ${assignedCount}/${playerCount}。` });
     return result;
-  }, [playerCount, quota, seats, selected, selectedRoles, totals]);
+  }, [activeSetupModifiers, playerCount, quota, seats, selected, selectedRoles, totals]);
 
   function addLog(kind: LogKind, title: string, detail?: string, phase = gamePhase, day = dayNumber) {
     const createdAt = Date.now();
@@ -422,17 +435,13 @@ export default function BoardBuilder() {
       pool.slice(0, Math.max(0, target - already)).forEach((role) => next.add(role.id));
     };
 
-    addToAlignment('townsfolk', baseQuota.townsfolk);
-    const targetQuota = withBalloonistSetup(baseQuota, next.has('balloonist'));
-    if (next.has('balloonist')) {
-      const removableTownsfolk = script.roles.filter((role) => role.alignment === 'townsfolk' && role.id !== 'balloonist' && next.has(role.id) && !locked.has(role.id));
-      while (script.roles.filter((role) => role.alignment === 'townsfolk' && next.has(role.id)).length > targetQuota.townsfolk && removableTownsfolk.length) {
-        next.delete(removableTownsfolk.pop()!.id);
-      }
-    }
-    addToAlignment('outsider', targetQuota.outsider);
-    addToAlignment('minion', targetQuota.minion);
-    addToAlignment('demon', targetQuota.demon);
+    alignments.forEach((alignment) => addToAlignment(alignment,baseQuota[alignment]));
+    const targetQuota = withSetupAdjustments(baseQuota,next);
+    alignments.forEach((alignment) => {
+      const removable = (random ? shuffled(script.roles) : [...script.roles]).filter((role) => role.alignment === alignment && next.has(role.id) && !locked.has(role.id) && !setupRoleIds.has(role.id));
+      while (script.roles.filter((role) => role.alignment === alignment && next.has(role.id)).length > targetQuota[alignment] && removable.length) next.delete(removable.pop()!.id);
+      addToAlignment(alignment,targetQuota[alignment]);
+    });
     const bluffPool = script.roles.filter((role) => (role.alignment === 'townsfolk' || role.alignment === 'outsider') && !next.has(role.id));
     setSelected(next); setDemonBluffs(shuffled(bluffPool).slice(0,3).map((role) => role.id)); setSeats(makeSeats(playerCount)); setCompletedSteps(new Set()); setAbilityTargets({}); setAutomaticPoisonSeat(null);
   }
@@ -615,7 +624,7 @@ export default function BoardBuilder() {
       <div className="catalog-panel">
         <div className="script-heading"><div><span className="eyebrow">当前剧本</span><h2>{script.name}</h2></div></div>
         {!!script.specialRules?.length && <div className="special-rule-strip">{script.specialRules.map((rule) => <span key={rule.name}><CircleHelp/><b>{rule.name}</b>{rule.description}</span>)}</div>}
-        <div className="quota-strip"><span className="quota-title"><Users size={16}/>{playerCount} 人{balloonistSetupActive ? '调整后' : '标准'}名额</span>{alignments.map((alignment) => <span key={alignment} className={`quota quota-${alignment}`}>{alignmentMeta[alignment].short}<b>{quota[alignment]}</b></span>)}{balloonistSetupActive && <span className="quota-modifier">气球驾驶员：镇民 −1 · 外来者 +1</span>}</div>
+        <div className="quota-strip"><span className="quota-title"><Users size={16}/>{playerCount} 人{activeSetupModifiers.length ? '调整后' : '标准'}名额</span>{alignments.map((alignment) => <span key={alignment} className={`quota quota-${alignment}`}>{alignmentMeta[alignment].short}<b>{quota[alignment]}</b></span>)}{activeSetupModifiers.map((modifier) => <span key={modifier.id} className="quota-modifier">{modifier.label}</span>)}</div>
         <nav className="workspace-nav" aria-label="工具视图">
           <button className={view === 'roles' ? 'is-active' : ''} onClick={() => setView('roles')}><LayoutGrid/>角色配板</button>
           <button className={view === 'seats' ? 'is-active' : ''} onClick={() => setView('seats')}><Users/>环形座位</button>

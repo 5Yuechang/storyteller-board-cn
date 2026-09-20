@@ -69,6 +69,7 @@ button,select { font:inherit; } button { cursor:pointer; }
 .role-card.role-minion.is-selected,.role-card.role-demon.is-selected { border-color:#a85248; background:#fbf1ed; box-shadow:inset 3px 0 0 #983f35; }
 .role-topline { display:flex; align-items:center; gap:9px; }
 .role-icon { width:42px; height:42px; flex:none; border:1px solid #d6cbbb; border-radius:50%; object-fit:cover; background:#efe8d9; box-shadow:inset 0 0 0 2px #fff9; }
+.role-glyph { display:inline-grid; place-items:center; overflow:hidden; color:#443b52; background:radial-gradient(circle at 36% 30%,#fffdf7,#e9e0f0); font-family:"Segoe UI Symbol","Segoe UI Emoji",sans-serif; font-size:20px; font-weight:800; line-height:1; }
 .role-name { border:0; padding:0; background:transparent; color:#173e43; font-family:var(--font-display); font-size:18px; font-weight:800; letter-spacing:.05em; }
 .role-minion .role-name,.role-demon .role-name { color:#87362f; }
 .timing { margin-left:auto; color:#77776e; font-size:10px; }
