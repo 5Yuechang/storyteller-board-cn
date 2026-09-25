@@ -1,15 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
-import { AlertTriangle, BellRing, BookOpen, Check, ChevronDown, ChevronRight, ChevronUp, CircleHelp, Dice5, EyeOff, Gauge, LayoutGrid, Lightbulb, List, Lock, Maximize2, Moon, Play, Plus, RotateCcw, ShieldCheck, Shuffle, Skull, Sparkles, Sunrise, Trash2, UserRound, Users } from 'lucide-react';
+import { AlertTriangle, BookOpen, Check, ChevronDown, ChevronRight, ChevronUp, CircleHelp, Dice5, EyeOff, LayoutGrid, Lightbulb, List, Lock, Maximize2, Moon, Play, Plus, RotateCcw, ShieldCheck, Shuffle, Skull, Sparkles, Sunrise, Trash2, UserRound, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { alignmentMeta, scripts, type Alignment, type NightStep, type Role } from '@/app/data/scripts';
-import { evaluateBoardBalance } from '@/app/data/balance';
-import { specialAttention } from '@/app/data/special-attention';
 
 const alignments: Alignment[] = ['townsfolk', 'outsider', 'minion', 'demon'];
 type ViewMode = 'roles' | 'seats' | 'night' | 'advice' | 'history';
@@ -308,11 +306,7 @@ export default function BoardBuilder() {
   const activeSetupModifiers = useMemo(() => setupModifiers(selected), [selected]);
   const quota = useMemo(() => withSetupAdjustments(baseQuota, selected), [baseQuota, selected]);
   const selectedRoles = script.roles.filter((role) => selected.has(role.id));
-  const boardBalance = useMemo(() => evaluateBoardBalance(selectedRoles), [selectedRoles]);
-  const attentionRoles = selectedRoles.flatMap((role) => (specialAttention[role.id] ?? []).map((item) => ({ role, item })));
-  const blueFactor = [...boardBalance.factors].filter((factor) => factor.value > 0).sort((a,b) => b.value - a.value)[0];
-  const redFactor = [...boardBalance.factors].filter((factor) => factor.value < 0).sort((a,b) => a.value - b.value)[0];
-  const availableBluffs = script.roles.filter((role) => (role.alignment === 'townsfolk' || role.alignment === 'outsider') && !selected.has(role.id));
+  const availableBluffs = script.roles.filter((role) => (role.alignment === 'townsfolk' || (quota.outsider > 0 && role.alignment === 'outsider')) && !selected.has(role.id));
   const adviceRoles = selectedRoles.filter((role) => role.misinformation?.length);
   const activeSeatState = seats.find((seat) => seat.number === activeSeat) ?? seats[0];
   const totals = useMemo(() => Object.fromEntries(alignments.map((alignment) => [alignment, selectedRoles.filter((role) => role.alignment === alignment).length])) as Record<Alignment, number>, [selectedRoles]);
@@ -392,8 +386,12 @@ export default function BoardBuilder() {
   }, [abilityTargets, activeSeat, automaticPoisonSeat, completedSteps, dayNumber, demonBluffs, gameLog, gamePhase, gameStarted, historyReady, locked, nightFocusMode, nightMode, playerCount, scriptId, seats, selected, view]);
 
   useEffect(() => {
-    setDemonBluffs((current) => current.map((id) => id && selected.has(id) ? null : id));
-  }, [selected]);
+    setDemonBluffs((current) => current.map((id) => {
+      if (!id || selected.has(id)) return null;
+      const role = script.roles.find((item) => item.id === id);
+      return role && (role.alignment === 'townsfolk' || (quota.outsider > 0 && role.alignment === 'outsider')) ? id : null;
+    }));
+  }, [quota.outsider, script.roles, selected]);
 
   const messages = useMemo(() => {
     const result: { type: 'ok'|'warn'|'info'; text: string }[] = [];
@@ -442,7 +440,7 @@ export default function BoardBuilder() {
       while (script.roles.filter((role) => role.alignment === alignment && next.has(role.id)).length > targetQuota[alignment] && removable.length) next.delete(removable.pop()!.id);
       addToAlignment(alignment,targetQuota[alignment]);
     });
-    const bluffPool = script.roles.filter((role) => (role.alignment === 'townsfolk' || role.alignment === 'outsider') && !next.has(role.id));
+    const bluffPool = script.roles.filter((role) => (role.alignment === 'townsfolk' || (targetQuota.outsider > 0 && role.alignment === 'outsider')) && !next.has(role.id));
     setSelected(next); setDemonBluffs(shuffled(bluffPool).slice(0,3).map((role) => role.id)); setSeats(makeSeats(playerCount)); setCompletedSteps(new Set()); setAbilityTargets({}); setAutomaticPoisonSeat(null);
   }
   function changePlayerCount(count: number) {
@@ -688,19 +686,8 @@ export default function BoardBuilder() {
       <aside id="current-board-panel" className={`board-panel ${mobileBoardOpen ? 'is-mobile-open' : ''}`}>
         <div className="board-heading"><div><span className="eyebrow">LIVE BOARD</span><h2>当前配板</h2></div><span className="total-count">{selectedRoles.length}<small>/{playerCount}</small></span></div>
         <div className="board-actions"><Button className="random-board" onClick={() => buildBoard(true)}><Dice5/>随机配板</Button><Button variant="outline" onClick={() => buildBoard(false)}><Sparkles/>按名额补齐</Button><Button variant="outline" onClick={() => { setSelected(new Set(locked)); resetRoundState(); }}><RotateCcw/>清空未锁定</Button></div>
-        <section className={`balance-card balance-${boardBalance.tendency}`}>
-          <div className="balance-heading"><Gauge/><div><span>阵营压力指数</span><small>综合角色能力与干扰强度估算</small></div><b>{boardBalance.label}</b></div>
-          <div className="balance-numbers"><strong className="balance-blue">蓝 {boardBalance.blue}%</strong><strong className="balance-red">红 {boardBalance.red}%</strong></div>
-          <div className="balance-track" aria-label={`蓝方 ${boardBalance.blue}%，红方 ${boardBalance.red}%`}><i style={{ width:`${boardBalance.blue}%` }}/><i style={{ width:`${boardBalance.red}%` }}/></div>
-          {selectedRoles.length ? <div className="balance-factors">{blueFactor && <span className="factor-blue"><b>{blueFactor.role.name}</b>{blueFactor.reason}</span>}{redFactor && <span className="factor-red"><b>{redFactor.role.name}</b>{redFactor.reason}</span>}</div> : <p className="balance-empty">选择角色后自动计算当前配板倾向。</p>}
-          <p className="balance-disclaimer">仅供说书人配板参考，不代表实际胜率或规则判定。</p>
-        </section>
-        {!!attentionRoles.length && <section className="attention-card">
-          <div className="attention-heading"><BellRing/><div><span>特殊角色提醒</span><small>按当前配板自动出现</small></div><b>{attentionRoles.length}</b></div>
-          <div className="attention-list">{attentionRoles.map(({ role, item }, index) => <article key={`${role.id}-${index}`}><RoleIcon role={role} className="attention-role-icon"/><div><header><strong>{role.name}</strong><span>{item.when}</span></header><p>{item.text}</p></div></article>)}</div>
-        </section>}
         <section className={`evil-win-status ${demonDefeated ? 'is-good-win' : deathsUntilEvilWin === 0 ? 'is-at-line' : ''}`}>{demonDefeated ? <ShieldCheck/> : <Skull/>}<div><span>{demonDefeated ? '游戏胜负' : '邪恶方人数胜利线'}</span><strong>{demonDefeated ? '恶魔已死亡，善良方获胜' : deathsUntilEvilWin ? `还需死亡 ${deathsUntilEvilWin} 人` : '邪恶方胜利人数条件已达成'}</strong><small>{demonDefeated ? '角色能力另有说明时除外' : '所有阵营都计入存活人数；恶魔死亡则善良获胜'}</small></div><b>{aliveCount}<small> 存活</small></b></section>
-        <section className="demon-bluffs"><div className="bluff-heading"><div><EyeOff/><span><b>给恶魔的三个伪装</b><small>由说书人准备三个当前不在场的善良角色，首夜展示给恶魔</small></span></div><button onClick={randomizeBluffs} disabled={!selectedRoles.some((role) => role.alignment === 'demon') || availableBluffs.length < 3}><Shuffle/>随机准备</button></div>
+        <section className="demon-bluffs"><div className="bluff-heading"><div><EyeOff/><span><b>给恶魔的三个伪装</b><small>按当前阵营名额筛选不在场身份；外来者名额为 0 时只提供镇民</small></span></div><button onClick={randomizeBluffs} disabled={!selectedRoles.some((role) => role.alignment === 'demon') || availableBluffs.length < 3}><Shuffle/>随机准备</button></div>
           {selectedRoles.some((role) => role.alignment === 'demon') ? <div className="bluff-slots">{demonBluffs.map((roleId,index) => {
             const role = script.roles.find((item) => item.id === roleId);
             const options = availableBluffs.filter((item) => !demonBluffs.includes(item.id) || item.id === roleId);
