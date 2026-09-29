@@ -148,10 +148,6 @@ export const scripts: ScriptDefinition[] = [{
 }, {
   id:'midnight-oasis', name:'夜半狂欢', author:'Zets', playerRange:[7,15],
   description:'“旋转木马”快速上手剧本：角色变化、阵营转换与说书人裁定集中出现。', counts:standardCounts,
-  specialRules:[
-    {name:'哨兵',description:'在初始设置时，可能会额外增加或减少一个外来者。'},
-    {name:'圣洁之魂',description:'游戏过程中，邪恶玩家的总数最多能比初始设置多一名。'},
-  ],
   roles:[
     {id:'noble',name:'贵族',alignment:'townsfolk',timing:'首夜',ability:'在你的首个夜晚，你会得知三名玩家：其中有且只有一名玩家是邪恶的。',misinformation:['展示三名善良玩家。','展示两名邪恶玩家与一名善良玩家。']},
     {id:'snake-charmer',name:'舞蛇人',alignment:'townsfolk',timing:'每夜',ability:'每个夜晚，你要选择一名存活的玩家：如果你选中了恶魔，你和他交换角色和阵营，随后他中毒。'},
