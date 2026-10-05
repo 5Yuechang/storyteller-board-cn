@@ -51,8 +51,5 @@
     "vite": "8.0.13",
     "wrangler": "4.92.0"
   },
-  "optionalDependencies": {
-    "@rolldown/binding-win32-x64-msvc": "^1.0.1"
-  },
   "type": "module"
 }
