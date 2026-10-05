@@ -23,7 +23,10 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      # The lockfile was generated on Windows and includes a harmless optional
+      # Windows Rolldown binding; --force lets npm retain the lockfile while
+      # Rolldown selects the Linux binding at runtime on the Pages runner.
+      - run: npm ci --force
       - run: npm run build
         env:
           NEXT_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
