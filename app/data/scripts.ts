@@ -1,5 +1,6 @@
 export type Alignment = 'townsfolk' | 'outsider' | 'minion' | 'demon';
-export type Role = { id: string; name: string; alignment: Alignment; ability: string; glyph?: string; timing?: '首夜' | '每夜' | '每夜*' | '白天' | '被动' | '一次'; setup?: string; note?: string; misinformation?: string[] };
+export type SetupRules = { outsiderDelta?: { options:number[]; default:number }; requiresNoEvil?:boolean };
+export type Role = { id: string; name: string; alignment: Alignment; ability: string; glyph?: string; timing?: '首夜' | '每夜' | '每夜*' | '白天' | '被动' | '一次'; setup?: string; setupRules?:SetupRules; maxCopies?:number; note?: string; misinformation?: string[] };
 export type PlayerCount = Record<Alignment, number>;
 export type NightStep = { id: string; name: string; note: string; roleId?: string; phase?: '信息'|'行动'|'结算'; deadMode?: 'show'|'only'; requiredAlignment?: Alignment; skipWhenRolePresent?: string };
 export type ScriptDefinition = { id: string; name: string; author: string; playerRange: [number, number]; description: string; counts: Record<number, PlayerCount>; roles: Role[]; specialRules?: { name:string; description:string }[]; nightOrder: { first: NightStep[]; other: NightStep[] } };
@@ -19,7 +20,7 @@ export const scripts: ScriptDefinition[] = [{
     {id:'fortune-teller',name:'占卜师',alignment:'townsfolk',timing:'每夜',ability:'每个夜晚，你要选择两名玩家：你会得知他们之中是否有恶魔。会有一名善良玩家始终被你的能力当作“恶魔”。',misinformation:['在不含恶魔、也不含红鲱鱼的组合上给出“是”。','在包含恶魔的组合上给出“否”，为恶魔制造一次可信认证。','让连续两晚的答案形成一致但错误的世界，而不是随机翻转。']},
     {id:'snake-charmer',name:'舞蛇人',alignment:'townsfolk',timing:'每夜',ability:'每个夜晚，你要选择一名存活的玩家：如果你选中了恶魔，你和他交换角色和阵营，随后他中毒。'},
     {id:'preacher',name:'传教士',alignment:'townsfolk',timing:'每夜',ability:'每个夜晚，你要选择一名玩家：如果你选中了爪牙，他会得知被传教士选中。所有被你选中的爪牙失去能力。'},
-    {id:'balloonist',name:'气球驾驶员',alignment:'townsfolk',timing:'每夜',ability:'每个夜晚，你会得知一名与上个夜晚得知的玩家角色类型不同的玩家。',setup:'+0～1 外来者',misinformation:['连续展示相同角色类型的玩家，让类型链在复盘时出现缺口。','跳过一种角色类型，诱导玩家错误排除某个阵营。','先给可信玩家，再把邪恶玩家接入看似合法的类型链。']},
+    {id:'balloonist',name:'气球驾驶员',alignment:'townsfolk',timing:'每夜',ability:'每个夜晚，你会得知一名与上个夜晚得知的玩家角色类型不同的玩家。',setup:'+1 外来者',setupRules:{outsiderDelta:{options:[1],default:1}},misinformation:['连续展示相同角色类型的玩家，让类型链在复盘时出现缺口。','跳过一种角色类型，诱导玩家错误排除某个阵营。','先给可信玩家，再把邪恶玩家接入看似合法的类型链。']},
     {id:'huntsman',name:'巡山人',alignment:'townsfolk',timing:'一次',ability:'每局游戏限一次，在夜晚时，你可以选择一名存活的玩家：如果你选中了落难少女，她会变成一个不在场的镇民角色。',setup:'+ 落难少女'},
     {id:'professor',name:'教授',alignment:'townsfolk',timing:'一次',ability:'每局游戏限一次，在夜晚时，你可以选择一名死亡的玩家：如果他是镇民，他会被复活。'},
     {id:'savant',name:'博学者',alignment:'townsfolk',timing:'白天',ability:'每个白天，你可以私下询问说书人以得知两条信息：一个是正确的，一个是错误的。',misinformation:['给出两条都为真但看似互相冲突的信息，制造能力异常感。','给出两条都为假、却共同支持一个错误世界的信息。','把一条信息绑定到已死亡玩家或过去事件，降低即时可验证性。']},
@@ -27,7 +28,7 @@ export const scripts: ScriptDefinition[] = [{
     {id:'poppy-grower',name:'罂粟种植者',alignment:'townsfolk',timing:'被动',ability:'爪牙和恶魔互不认识。如果你死亡，当晚他们会互相认识。'},
     {id:'banshee',name:'秉笔',alignment:'townsfolk',timing:'被动',ability:'如果你在白天死亡，当晚你会得知一名善良玩家；如果你在夜晚死亡，当晚你会得知一名邪恶玩家。',note:'名称与能力按上传剧本图录入',misinformation:['白天死亡时展示一名邪恶玩家，反转其善良认证。','夜晚死亡时展示一名善良玩家，把怀疑推向错误目标。','优先选择尚未公开身份的玩家，让错误信息保留讨论空间。']},
     {id:'redirector',name:'半仙',alignment:'townsfolk',timing:'被动',ability:'每个在夜晚使用自身能力选择你的其他玩家，会改为选中另一名邪恶玩家作为替代。',note:'自制角色'},
-    {id:'atheist',name:'无神论者',alignment:'townsfolk',timing:'被动',ability:'说书人可以打破游戏规则。如果说书人被处决，善良阵营获胜，即使你已死亡。',setup:'无邪恶角色在场'},
+    {id:'atheist',name:'无神论者',alignment:'townsfolk',timing:'被动',ability:'说书人可以打破游戏规则。如果说书人被处决，善良阵营获胜，即使你已死亡。',setup:'无邪恶角色在场',setupRules:{requiresNoEvil:true}},
 
     {id:'lunatic',name:'疯子',alignment:'outsider',timing:'被动',ability:'你以为你是一个恶魔，但其实你不是。恶魔知道你是疯子以及你在每个夜晚选择了哪些玩家。'},
     {id:'damsel',name:'落难少女',alignment:'outsider',timing:'被动',ability:'所有爪牙都知道落难少女在场。每局游戏限一次，任意爪牙可以公开猜测你是落难少女；如果猜对，你的阵营落败。'},
@@ -89,7 +90,7 @@ export const scripts: ScriptDefinition[] = [{
     {id:'chef',name:'厨师',alignment:'townsfolk',timing:'首夜',ability:'在你的首个夜晚，你会得知场上邻座的邪恶玩家有多少对。',misinformation:['把数字上下偏移一，使座位链仍保留可推理空间。','给出零，诱导玩家错误拆散真实邪恶邻座。']},
     {id:'grandmother',name:'祖母',alignment:'townsfolk',timing:'首夜',ability:'在你的首个夜晚，你会得知一名善良玩家和他的角色。如果恶魔杀死了他，你也会死亡。',misinformation:['把一名邪恶玩家展示为某个不在场的善良角色。','展示真实善良玩家，但给出错误角色。']},
     {id:'fortune-teller',name:'占卜师',alignment:'townsfolk',timing:'每夜',ability:'每个夜晚，你要选择两名玩家：你会得知他们之中是否有恶魔。会有一名善良玩家始终被你的能力当作“恶魔”。',misinformation:['在不含恶魔的组合上给出“是”。','在包含恶魔的组合上给出“否”。']},
-    {id:'balloonist',name:'气球驾驶员',alignment:'townsfolk',timing:'每夜',ability:'每个夜晚，你会得知一名不同角色类型的玩家，直到场上所有角色类型你都得知过一次。',setup:'+1 外来者',misinformation:['连续展示相同角色类型，制造错误类型链。','跳过一种类型，诱导玩家错误排除阵营。']},
+    {id:'balloonist',name:'气球驾驶员',alignment:'townsfolk',timing:'每夜',ability:'每个夜晚，你会得知一名不同角色类型的玩家，直到场上所有角色类型你都得知过一次。',setup:'+1 外来者',setupRules:{outsiderDelta:{options:[1],default:1}},misinformation:['连续展示相同角色类型，制造错误类型链。','跳过一种类型，诱导玩家错误排除阵营。']},
     {id:'dreamer',name:'筑梦师',alignment:'townsfolk',timing:'每夜',ability:'每个夜晚，你要选择除你及旅行者以外的一名玩家：你会得知一个善良角色和一个邪恶角色，该玩家是其中一个角色。',misinformation:['给出两个都不是目标的角色。','用目标的真实阵营搭配一个错误角色，保留可信度。']},
     {id:'snake-charmer',name:'舞蛇人',alignment:'townsfolk',timing:'每夜',ability:'每个夜晚，你要选择一名存活的玩家：如果你选中了恶魔，你和他交换角色和阵营，随后他中毒。'},
     {id:'gambler',name:'赌徒',alignment:'townsfolk',timing:'每夜*',ability:'每个夜晚*，你要选择一名玩家并猜测他的角色：如果你猜错了，你会死亡。'},
@@ -105,14 +106,14 @@ export const scripts: ScriptDefinition[] = [{
     {id:'recluse',name:'陌客',alignment:'outsider',timing:'被动',ability:'你可能会被当作邪恶阵营、爪牙角色或恶魔角色，即使你已死亡。'},
     {id:'sweetheart',name:'心上人',alignment:'outsider',timing:'被动',ability:'当你死亡时，会有一名玩家开始醉酒。'},
 
-    {id:'godfather',name:'教父',alignment:'minion',timing:'每夜*',ability:'在你的首个夜晚，你会得知有哪些外来者角色在场。如果有外来者在白天死亡，你会在当晚被唤醒并选择一名玩家：他死亡。',setup:'-1 或 +1 外来者'},
+    {id:'godfather',name:'教父',alignment:'minion',timing:'每夜*',ability:'在你的首个夜晚，你会得知有哪些外来者角色在场。如果有外来者在白天死亡，你会在当晚被唤醒并选择一名玩家：他死亡。',setup:'-1 或 +1 外来者',setupRules:{outsiderDelta:{options:[-1,1],default:1}}},
     {id:'cerenovus',name:'洗脑师',alignment:'minion',timing:'每夜',ability:'每个夜晚，你要选择一名玩家和一个善良角色。他明天白天和夜晚需要“疯狂”地证明自己是这个角色，否则他可能被处决。'},
     {id:'pit-hag',name:'麻脸巫婆',alignment:'minion',timing:'每夜*',ability:'每个夜晚*，你要选择一名玩家和一个角色：如果该角色不在场，他变成该角色。如果因此创造了一个恶魔，当晚的死亡由说书人决定。'},
     {id:'widow',name:'寡妇',alignment:'minion',timing:'首夜',ability:'在你的首个夜晚，你能查看魔典并选择一名玩家：他中毒。随后，始终会有一名善良玩家知道寡妇在场。'},
 
     {id:'imp',name:'小恶魔',alignment:'demon',timing:'每夜*',ability:'每个夜晚*，你要选择一名玩家：他死亡。如果你以这种方式自杀，一名爪牙会变成小恶魔。'},
-    {id:'vigormortis',name:'亡骨魔',alignment:'demon',timing:'每夜*',ability:'每个夜晚*，你要选择一名玩家：他死亡。被该能力杀死的爪牙保留他的能力，且与他邻近的两名镇民之一中毒。',setup:'-1 外来者'},
-    {id:'fang-gu',name:'方古',alignment:'demon',timing:'每夜*',ability:'每个夜晚*，你要选择一名玩家：他死亡。被该能力杀死的外来者改为变成邪恶的方古且你代替他死亡，但每局游戏仅能成功转化一次。',setup:'+1 外来者'},
+    {id:'vigormortis',name:'亡骨魔',alignment:'demon',timing:'每夜*',ability:'每个夜晚*，你要选择一名玩家：他死亡。被该能力杀死的爪牙保留他的能力，且与他邻近的两名镇民之一中毒。',setup:'-1 外来者',setupRules:{outsiderDelta:{options:[-1],default:-1}}},
+    {id:'fang-gu',name:'方古',alignment:'demon',timing:'每夜*',ability:'每个夜晚*，你要选择一名玩家：他死亡。被该能力杀死的外来者改为变成邪恶的方古且你代替他死亡，但每局游戏仅能成功转化一次。',setup:'+1 外来者',setupRules:{outsiderDelta:{options:[1],default:1}}},
   ],
   nightOrder:{
     first:[
@@ -151,7 +152,7 @@ export const scripts: ScriptDefinition[] = [{
   roles:[
     {id:'noble',name:'贵族',alignment:'townsfolk',timing:'首夜',ability:'在你的首个夜晚，你会得知三名玩家：其中有且只有一名玩家是邪恶的。',misinformation:['展示三名善良玩家。','展示两名邪恶玩家与一名善良玩家。']},
     {id:'snake-charmer',name:'舞蛇人',alignment:'townsfolk',timing:'每夜',ability:'每个夜晚，你要选择一名存活的玩家：如果你选中了恶魔，你和他交换角色和阵营，随后他中毒。'},
-    {id:'balloonist',name:'气球驾驶员',alignment:'townsfolk',timing:'每夜',ability:'每个夜晚，你会得知一名与上个夜晚得知的玩家角色类型不同的玩家。',setup:'+0～1 外来者',misinformation:['连续展示相同角色类型。','跳过一种类型，制造错误类型链。']},
+    {id:'balloonist',name:'气球驾驶员',alignment:'townsfolk',timing:'每夜',ability:'每个夜晚，你会得知一名与上个夜晚得知的玩家角色类型不同的玩家。',setup:'+1 外来者',setupRules:{outsiderDelta:{options:[1],default:1}},misinformation:['连续展示相同角色类型。','跳过一种类型，制造错误类型链。']},
     {id:'huntsman',name:'巡山人',alignment:'townsfolk',timing:'一次',ability:'每局游戏限一次，在夜晚时，你可以选择一名存活的玩家：如果你选中了落难少女，她会变成一个不在场的镇民角色。',setup:'+ 落难少女'},
     {id:'engineer',name:'工程师',alignment:'townsfolk',timing:'一次',ability:'每局游戏限一次，在夜晚时，你可以选择让恶魔变成你选择的恶魔角色，或让所有爪牙变成你选择的爪牙角色。'},
     {id:'fisherman',name:'渔夫',alignment:'townsfolk',timing:'白天',ability:'每局游戏限一次，在白天时，你可以让说书人给你一些能帮助你的阵营获胜的建议。'},
@@ -161,7 +162,7 @@ export const scripts: ScriptDefinition[] = [{
     {id:'farmer',name:'农夫',alignment:'townsfolk',timing:'被动',ability:'当你在夜晚死亡时，一名存活的善良玩家会变成农夫。'},
     {id:'cannibal',name:'食人族',alignment:'townsfolk',timing:'被动',ability:'你拥有上个死于处决的玩家的能力。如果该玩家属于邪恶阵营，你中毒直到下个善良玩家死于处决。'},
     {id:'poppy-grower',name:'罂粟种植者',alignment:'townsfolk',timing:'被动',ability:'爪牙和恶魔互不认识。如果你死亡，当晚他们会互相认识。'},
-    {id:'atheist',name:'无神论者',alignment:'townsfolk',timing:'被动',ability:'说书人可以打破游戏规则。如果说书人被处决，善良阵营获胜，即使你已死亡。',setup:'无邪恶角色在场'},
+    {id:'atheist',name:'无神论者',alignment:'townsfolk',timing:'被动',ability:'说书人可以打破游戏规则。如果说书人被处决，善良阵营获胜，即使你已死亡。',setup:'无邪恶角色在场',setupRules:{requiresNoEvil:true}},
 
     {id:'drunk',name:'酒鬼',alignment:'outsider',timing:'被动',ability:'你不知道你是酒鬼。你以为你是一个镇民角色，但其实你不是。'},
     {id:'barber',name:'理发师',alignment:'outsider',timing:'被动',ability:'如果你死亡，在当晚恶魔可以选择两名玩家（不能选择其他恶魔）交换角色。'},
@@ -174,7 +175,7 @@ export const scripts: ScriptDefinition[] = [{
     {id:'pit-hag',name:'麻脸巫婆',alignment:'minion',timing:'每夜*',ability:'每个夜晚*，你要选择一名玩家和一个角色：如果该角色不在场，他变成该角色。如果因此创造了一个恶魔，当晚的死亡由说书人决定。'},
 
     {id:'hadi-jiya',name:'哈迪寂亚',alignment:'demon',timing:'每夜*',ability:'每个夜晚*，你可以选择三名玩家（所有玩家都会得知你选了谁）：他们分别秘密决定自己的生死，然后如果他们都存活则都死亡。'},
-    {id:'vigormortis',name:'亡骨魔',alignment:'demon',timing:'每夜*',ability:'每个夜晚*，你要选择一名玩家：他死亡。被该能力杀死的爪牙保留他的能力，且与他邻近的两名镇民之一中毒。',setup:'-1 外来者'},
+    {id:'vigormortis',name:'亡骨魔',alignment:'demon',timing:'每夜*',ability:'每个夜晚*，你要选择一名玩家：他死亡。被该能力杀死的爪牙保留他的能力，且与他邻近的两名镇民之一中毒。',setup:'-1 外来者',setupRules:{outsiderDelta:{options:[-1],default:-1}}},
   ],
   nightOrder:{
     first:[
@@ -236,8 +237,8 @@ export const scripts: ScriptDefinition[] = [{
     {id:'pit-hag',name:'麻脸巫婆',alignment:'minion',timing:'每夜*',ability:'每个夜晚*，你要选择一名玩家和一个角色：如果该角色不在场，他变成该角色。如果因此创造了一个恶魔，当晚的死亡由说书人决定。'},
     {id:'evil-twin',name:'镜像双子',glyph:'🎭',alignment:'minion',timing:'首夜',ability:'你与一名对立阵营的玩家互相知道对方是什么角色。如果善良双子被处决，邪恶阵营获胜；如果你们都存活，善良阵营无法获胜。'},
 
-    {id:'fang-gu',name:'方古',alignment:'demon',timing:'每夜*',ability:'每个夜晚*，你要选择一名玩家：他死亡。首次用此能力杀死外来者时，他转为邪恶方古且你代替他死亡。',setup:'+1 外来者'},
-    {id:'vigormortis',name:'亡骨魔',alignment:'demon',timing:'每夜*',ability:'每个夜晚*，你要选择一名玩家：他死亡。被该能力杀死的爪牙保留能力，且与他邻近的两名镇民之一中毒。',setup:'-1 外来者'},
+    {id:'fang-gu',name:'方古',alignment:'demon',timing:'每夜*',ability:'每个夜晚*，你要选择一名玩家：他死亡。首次用此能力杀死外来者时，他转为邪恶方古且你代替他死亡。',setup:'+1 外来者',setupRules:{outsiderDelta:{options:[1],default:1}}},
+    {id:'vigormortis',name:'亡骨魔',alignment:'demon',timing:'每夜*',ability:'每个夜晚*，你要选择一名玩家：他死亡。被该能力杀死的爪牙保留能力，且与他邻近的两名镇民之一中毒。',setup:'-1 外来者',setupRules:{outsiderDelta:{options:[-1],default:-1}}},
     {id:'no-dashii',name:'诺-达鲺',glyph:'🐙',alignment:'demon',timing:'每夜*',ability:'每个夜晚*，你要选择一名玩家：他死亡。与你邻近的两名镇民中毒。'},
     {id:'vortox',name:'涡流',glyph:'🌪️',alignment:'demon',timing:'每夜*',ability:'每个夜晚*，你要选择一名玩家：他死亡。镇民玩家的能力都会产生错误信息。如果白天无人被处决，邪恶阵营获胜。'},
   ],
@@ -271,6 +272,117 @@ export const scripts: ScriptDefinition[] = [{
       {id:'sv-oracle-other',name:'神谕者',note:'告知当前死亡玩家中邪恶玩家的数量。',roleId:'oracle',phase:'信息'},
       {id:'sv-dreamer-other',name:'筑梦师',note:'选择一名玩家，展示一个善良角色和一个邪恶角色。',roleId:'dreamer',phase:'信息'},
       {id:'sv-mathematician-other',name:'数学家',note:'告知从上个黎明后因其他角色能力而异常运作的玩家人数。',roleId:'mathematician',phase:'信息'},
+    ]
+  }
+}, {
+  id:'dont-laugh-challenge', name:'不要笑挑战', author:'安眠', playerRange:[7,15],
+  description:'围绕笑话、疯狂、公开互动与说书人破规展开的欢乐自制剧本。', counts:standardCounts,
+  roles:[
+    {id:'librarian',name:'图书管理员',glyph:'📘',alignment:'townsfolk',timing:'首夜',ability:'在你的首个夜晚，你会得知两名玩家和一个外来者角色：这两名玩家之一是该角色（或者你会得知没有外来者在场）。'},
+    {id:'underwear-model',name:'内裤模特',glyph:'🩲',alignment:'townsfolk',timing:'首夜',ability:'在你的首个夜晚，你会得知有关邪恶阵营玩家的词组。'},
+    {id:'jokester',name:'牧童',glyph:'🐸',alignment:'townsfolk',timing:'白天',ability:'每个白天，你可以公开发表一个玩笑话。每局游戏限一次，你的玩笑话可能会变成现实。'},
+    {id:'groom',name:'马夫',glyph:'🐴',alignment:'townsfolk',timing:'白天',ability:'每个白天，你可以公开辱骂一名玩家：当晚你会得知该玩家是否为邪恶阵营。始终会有一名善良玩家被你的能力当作邪恶阵营。'},
+    {id:'mermaid',name:'美人鱼',glyph:'🧜‍♀️',alignment:'townsfolk',timing:'白天',ability:'每个白天，你可以公开接受一名其他玩家对你的赞美；邪恶角色的能力对他无效，直到你接受了另一名玩家的赞美。'},
+    {id:'astrologer',name:'占星师',glyph:'🌠',alignment:'townsfolk',timing:'白天',ability:'每个白天，你可以拜访说书人以得知一条错误信息。'},
+    {id:'fleet-commander',name:'舰队司令',glyph:'📣',alignment:'townsfolk',timing:'一次',ability:'每局游戏限一次，在白天时，你可以私下询问说书人以得知两名玩家：其中一名是对你们帮助最大的对立阵营玩家，另一名是对你们损害最大的我方阵营玩家。'},
+    {id:'rulebreaker',name:'落枕',glyph:'🛌',alignment:'townsfolk',timing:'一次',ability:'每局游戏限一次，说书人会在关于你的事情上打破规则。随后，你会秘密得知说书人为此做了什么。'},
+    {id:'masochist',name:'受虐狂',glyph:'🧎',alignment:'townsfolk',timing:'被动',ability:'在你的游戏中，如果你完成了说书人交给你的任务且你的阵营获胜，你可以拜访说书人并获得一条对你的阵营获胜有利的建议。'},
+    {id:'pixie',name:'小精灵',glyph:'🧸',alignment:'townsfolk',timing:'首夜',ability:'在你的首个夜晚，你会得知一个在场的镇民角色。如果你“疯狂”地证明你是该角色，当他死亡时你获得该角色的能力。'},
+    {id:'alchemist',name:'炼金术士',glyph:'⚗️',alignment:'townsfolk',timing:'首夜',ability:'你拥有一个爪牙角色的能力。当你使用能力时，说书人可能会要求你更换选择。'},
+    {id:'cannibal',name:'食人族',alignment:'townsfolk',timing:'被动',ability:'你拥有上个死于处决的玩家的能力。如果该玩家属于邪恶阵营，你中毒直到下个善良玩家死于处决。'},
+    {id:'cat-army',name:'猫猫军团',glyph:'🐱',alignment:'townsfolk',timing:'每夜',ability:'你顺时针上最近的猫猫军团是你的同伴。每个夜晚，你会得知同伴邻近的两名存活玩家中是否有邪恶玩家。',setup:'+0～2 猫猫军团',maxCopies:3,note:'可直接设置 1～3 名猫猫军团，名额、座位和夜序会同步计算。'},
+    {id:'atheist',name:'无神论者',alignment:'townsfolk',timing:'被动',ability:'说书人可以打破游戏规则。如果说书人被处决，善良阵营获胜，即使你已死亡。',setup:'无邪恶角色在场',setupRules:{requiresNoEvil:true}},
+
+    {id:'drunk',name:'酒鬼',alignment:'outsider',timing:'被动',ability:'你不知道你是酒鬼。你以为你是一个镇民角色，但其实你不是。'},
+    {id:'politician',name:'政客',glyph:'🏳️',alignment:'outsider',timing:'被动',ability:'如果你是对你的阵营落败负最大责任的人，你转变阵营并获胜，即使你已死亡。'},
+    {id:'poker-face',name:'面瘫',glyph:'🎭',alignment:'outsider',timing:'被动',ability:'如果你笑了，你可能被处决。'},
+    {id:'hermit',name:'隐士',glyph:'🗿',alignment:'outsider',timing:'被动',ability:'你拥有所有外来者能力。',setup:'−0～1 外来者',setupRules:{outsiderDelta:{options:[0,-1],default:0}}},
+
+    {id:'puck',name:'帕克 Puck',glyph:'🧚',alignment:'minion',timing:'一次',ability:'每局游戏限一次，在夜晚时*，你可以选择一个非恶魔角色：他死亡。如果该角色不在场，你要再选择一名玩家：他变成该角色。'},
+    {id:'magic-cat',name:'妖猫',glyph:'😼',alignment:'minion',timing:'每夜',ability:'每个夜晚，你要选择一名玩家（可选说书人 1 次）：他中毒（恶魔除外），且发言只能是“喵喵喵”直到下个黄昏，否则可能被处决。'},
+    {id:'spirit-whisperer',name:'灵言师',alignment:'minion',timing:'首夜',ability:'在你的首个夜晚，你会得知一个关键词。首个说出该关键词的善良玩家会在当晚转变为邪恶阵营。'},
+    {id:'psychopath',name:'精神病患者',alignment:'minion',timing:'白天',ability:'每个白天，在提名开始前，你可以公开选择一名玩家：他死亡。如果你被处决，提名你的玩家需要和你猜拳，只有你输了你才会死亡。'},
+
+    {id:'yaggababble',name:'牙噶巴卜',glyph:'🦷',alignment:'demon',timing:'首夜',ability:'在你的首个夜晚，你会得知一段秘密短语。每次你在白天公开说出这段短语，当天便可能会有一名玩家在这之后死亡。'},
+  ],
+  nightOrder:{
+    first:[
+      {id:'dl-minion-info',name:'爪牙信息',note:'唤醒爪牙，让其互认并确认恶魔。',phase:'信息',requiredAlignment:'minion'},
+      {id:'dl-demon-info',name:'恶魔信息',note:'确认爪牙并展示三项不在场的善良角色。',phase:'信息',requiredAlignment:'demon'},
+      {id:'dl-yaggababble-first',name:'牙噶巴卜',note:'告知一段秘密短语，并记录白天每次完整说出短语的次数。',roleId:'yaggababble',phase:'信息'},
+      {id:'dl-spirit-first',name:'灵言师',note:'告知一个关键词。',roleId:'spirit-whisperer',phase:'信息'},
+      {id:'dl-magic-cat-first',name:'妖猫',note:'选择一名玩家，使其中毒并限制其发言至下个黄昏。',roleId:'magic-cat',phase:'行动'},
+      {id:'dl-alchemist-first',name:'炼金术士',note:'告知其拥有的爪牙能力，并处理该能力需要的首夜行动。',roleId:'alchemist',phase:'信息'},
+      {id:'dl-pixie-first',name:'小精灵',note:'展示一个在场的镇民角色。',roleId:'pixie',phase:'信息'},
+      {id:'dl-underwear-first',name:'内裤模特',note:'告知有关邪恶阵营玩家的词组。',roleId:'underwear-model',phase:'信息'},
+      {id:'dl-librarian-first',name:'图书管理员',note:'展示两名玩家和一个外来者角色，或告知没有外来者在场。',roleId:'librarian',phase:'信息'},
+      {id:'dl-cat-army-first',name:'猫猫军团',note:'告知同伴邻近的两名存活玩家中是否有邪恶玩家。',roleId:'cat-army',phase:'信息'},
+    ],
+    other:[
+      {id:'dl-magic-cat-other',name:'妖猫',note:'选择一名玩家，使其中毒并限制其发言至下个黄昏。',roleId:'magic-cat',phase:'行动'},
+      {id:'dl-puck-other',name:'帕克',note:'若发动一次性能力，选择一个非恶魔角色；按是否在场处理死亡或角色变化。',roleId:'puck',phase:'行动'},
+      {id:'dl-cat-army-other',name:'猫猫军团',note:'告知同伴邻近的两名存活玩家中是否有邪恶玩家。',roleId:'cat-army',phase:'信息'},
+      {id:'dl-groom-other',name:'马夫',note:'若白天公开辱骂过玩家，告知该玩家是否被能力当作邪恶阵营。',roleId:'groom',phase:'信息'},
+    ]
+  }
+}, {
+  id:'old-acquaintance', name:'旧日熟识', author:'老许 & 王鑫', playerRange:[7,15],
+  description:'天津城市赛剧本，以邻座信息、夜间死亡和身份判断构成清晰而紧凑的推理链。', counts:standardCounts,
+  roles:[
+    {id:'chef',name:'厨师',alignment:'townsfolk',timing:'首夜',ability:'在你的首个夜晚，你会得知场上邻座的邪恶玩家有多少对。'},
+    {id:'librarian',name:'图书管理员',glyph:'📘',alignment:'townsfolk',timing:'首夜',ability:'在你的首个夜晚，你会得知两名玩家和一个外来者角色：这两名玩家之一是该角色（或者你会得知没有外来者在场）。'},
+    {id:'investigator',name:'调查员',alignment:'townsfolk',timing:'首夜',ability:'在你的首个夜晚，你会得知两名玩家和一个爪牙角色：这两名玩家之一是该角色（或者你会得知没有爪牙在场）。'},
+    {id:'grandmother',name:'祖母',alignment:'townsfolk',timing:'首夜',ability:'在你的首个夜晚，你会得知一名善良玩家和他的角色。如果恶魔杀死了他，你也会死亡。'},
+    {id:'empath',name:'共情者',glyph:'💙',alignment:'townsfolk',timing:'每夜',ability:'每个夜晚，你会得知与你邻近的两名存活玩家中邪恶玩家的数量。'},
+    {id:'oracle',name:'神谕者',glyph:'👁️',alignment:'townsfolk',timing:'每夜*',ability:'每个夜晚*，你会得知有多少名死亡玩家是邪恶的。'},
+    {id:'flowergirl',name:'卖花女孩',glyph:'🌼',alignment:'townsfolk',timing:'每夜*',ability:'每个夜晚*，你会得知今天白天恶魔是否投过票。'},
+    {id:'monk',name:'僧侣',glyph:'🙏',alignment:'townsfolk',timing:'每夜*',ability:'每个夜晚*，你要选择除你以外的一名玩家：当晚恶魔的负面能力对他无效。'},
+    {id:'gambler',name:'赌徒',alignment:'townsfolk',timing:'每夜*',ability:'每个夜晚*，你要选择一名玩家并猜测他的角色：如果你猜错了，你会死亡。'},
+    {id:'hunter',name:'猎手',glyph:'🏹',alignment:'townsfolk',timing:'一次',ability:'每局游戏限一次，你可以在白天公开选择一名玩家：如果他是恶魔，他死亡。'},
+    {id:'seamstress',name:'女裁缝',glyph:'✂️',alignment:'townsfolk',timing:'一次',ability:'每局游戏限一次，在夜晚时，你可以选择除你以外的两名玩家：你会得知他们是否为同一阵营。'},
+    {id:'soldier',name:'士兵',glyph:'🛡️',alignment:'townsfolk',timing:'被动',ability:'恶魔的负面能力对你无效。'},
+    {id:'ravenkeeper',name:'守鸦人',alignment:'townsfolk',timing:'被动',ability:'如果你在夜晚死亡，你会被唤醒，然后你要选择一名玩家：你会得知他的角色。'},
+
+    {id:'drunk',name:'酒鬼',alignment:'outsider',timing:'被动',ability:'你不知道你是酒鬼。你以为你是一个镇民角色，但其实你不是。'},
+    {id:'barber',name:'理发师',alignment:'outsider',timing:'被动',ability:'如果你死亡，在当晚恶魔可以选择两名玩家（不能选择其他恶魔）交换角色。'},
+    {id:'klutz',name:'呆瓜',glyph:'👞',alignment:'outsider',timing:'被动',ability:'当你得知你已死亡时，你必须公开选择一名存活玩家：如果他属于邪恶阵营，你的阵营落败。'},
+    {id:'recluse',name:'陌客',alignment:'outsider',timing:'被动',ability:'你可能会被当作邪恶阵营、爪牙角色或恶魔角色，即使你已死亡。'},
+
+    {id:'poisoner',name:'投毒者',alignment:'minion',timing:'每夜',ability:'每个夜晚，你要选择一名玩家：他在当晚和明天白天中毒。'},
+    {id:'godfather',name:'教父',alignment:'minion',timing:'每夜*',ability:'在你的首个夜晚，你会得知有哪些外来者角色在场。如果有外来者在白天死亡，你会在当晚被唤醒并选择一名玩家：他死亡。',setup:'−1 或 +1 外来者',setupRules:{outsiderDelta:{options:[-1,1],default:1}}},
+    {id:'scarlet-woman',name:'红唇女郎',glyph:'💋',alignment:'minion',timing:'被动',ability:'如果大于等于五名玩家存活（旅行者不计算在内）时恶魔死亡，你变成那个恶魔。'},
+    {id:'assassin',name:'刺客',glyph:'🗡️',alignment:'minion',timing:'一次',ability:'每局游戏限一次，在夜晚时*，你可以选择一名玩家：他死亡，即使因为任何原因他不会死亡。'},
+
+    {id:'imp',name:'小恶魔',alignment:'demon',timing:'每夜*',ability:'每个夜晚*，你要选择一名玩家：他死亡。如果你以这种方式自杀，一名爪牙会变成小恶魔。'},
+    {id:'vortox',name:'涡流',glyph:'🌪️',alignment:'demon',timing:'每夜*',ability:'每个夜晚*，你要选择一名玩家：他死亡。镇民玩家的能力都会产生错误信息。如果白天无人被处决，邪恶阵营获胜。'},
+    {id:'fang-gu',name:'方古',alignment:'demon',timing:'每夜*',ability:'每个夜晚*，你要选择一名玩家：他死亡。首次用此能力杀死外来者时，他转为邪恶方古且你代替他死亡。',setup:'+1 外来者',setupRules:{outsiderDelta:{options:[1],default:1}}},
+  ],
+  nightOrder:{
+    first:[
+      {id:'oa-poisoner-first',name:'投毒者',note:'选择一名玩家，使其中毒至明天黄昏。',roleId:'poisoner',phase:'行动'},
+      {id:'oa-minion-info',name:'爪牙信息',note:'唤醒爪牙，让其互认并确认恶魔。',phase:'信息',requiredAlignment:'minion'},
+      {id:'oa-demon-info',name:'恶魔信息',note:'确认爪牙并展示三项不在场的善良角色。',phase:'信息',requiredAlignment:'demon'},
+      {id:'oa-godfather-first',name:'教父',note:'展示本局在场的外来者角色。',roleId:'godfather',phase:'信息'},
+      {id:'oa-grandmother-first',name:'祖母',note:'展示一名善良玩家及其角色。',roleId:'grandmother',phase:'信息'},
+      {id:'oa-investigator-first',name:'调查员',note:'展示两名玩家和一个爪牙角色，或告知没有爪牙在场。',roleId:'investigator',phase:'信息'},
+      {id:'oa-librarian-first',name:'图书管理员',note:'展示两名玩家和一个外来者角色，或告知没有外来者在场。',roleId:'librarian',phase:'信息'},
+      {id:'oa-chef-first',name:'厨师',note:'告知邻座邪恶玩家的对数。',roleId:'chef',phase:'信息'},
+      {id:'oa-empath-first',name:'共情者',note:'告知两名存活邻座中邪恶玩家的数量。',roleId:'empath',phase:'信息'},
+      {id:'oa-seamstress-first',name:'女裁缝',note:'若发动能力，选择两名其他玩家并告知是否同阵营。',roleId:'seamstress',phase:'信息'},
+    ],
+    other:[
+      {id:'oa-poisoner-other',name:'投毒者',note:'选择一名玩家，使其中毒至明天黄昏。',roleId:'poisoner',phase:'行动'},
+      {id:'oa-monk-other',name:'僧侣',note:'选择除自己外的一名玩家，使恶魔负面能力当晚对其无效。',roleId:'monk',phase:'行动'},
+      {id:'oa-demon-other',name:'恶魔行动',note:'选择一名玩家死亡，并处理小恶魔传位、方古转化或涡流规则。',phase:'行动',requiredAlignment:'demon'},
+      {id:'oa-assassin-other',name:'刺客',note:'若发动一次性能力，选择一名玩家并使其必定死亡。',roleId:'assassin',phase:'行动'},
+      {id:'oa-godfather-other',name:'教父',note:'若今天有外来者死亡，选择一名玩家死亡。',roleId:'godfather',phase:'行动'},
+      {id:'oa-gambler-other',name:'赌徒',note:'选择一名玩家并猜测其角色；猜错则赌徒死亡。',roleId:'gambler',phase:'行动'},
+      {id:'oa-barber-other',name:'理发师',note:'若理发师死亡，恶魔可选择两名非其他恶魔玩家交换角色。',roleId:'barber',phase:'行动',deadMode:'only'},
+      {id:'oa-ravenkeeper-other',name:'守鸦人',note:'若今夜死亡，选择一名玩家并展示其角色。',roleId:'ravenkeeper',phase:'信息',deadMode:'only'},
+      {id:'oa-empath-other',name:'共情者',note:'告知两名存活邻座中邪恶玩家的数量。',roleId:'empath',phase:'信息'},
+      {id:'oa-oracle-other',name:'神谕者',note:'告知死亡玩家中邪恶玩家的数量。',roleId:'oracle',phase:'信息'},
+      {id:'oa-flowergirl-other',name:'卖花女孩',note:'告知今天白天恶魔是否投过票。',roleId:'flowergirl',phase:'信息'},
+      {id:'oa-seamstress-other',name:'女裁缝',note:'若尚未发动，可选择两名其他玩家并得知是否同阵营。',roleId:'seamstress',phase:'信息'},
     ]
   }
 }];

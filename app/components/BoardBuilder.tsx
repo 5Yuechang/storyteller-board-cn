@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { alignmentMeta, scripts, type Alignment, type NightStep, type Role } from '@/app/data/scripts';
 
 const alignments: Alignment[] = ['townsfolk', 'outsider', 'minion', 'demon'];
+const publicAsset = (path:string) => `${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}${path}`;
 type ViewMode = 'roles' | 'seats' | 'night' | 'history';
 type GamePhase = 'firstNight'|'day'|'night';
 type LogKind = 'system'|'death'|'status'|'role'|'night'|'note';
@@ -21,7 +22,7 @@ type SavedGameState = {
   seats:Seat[]; activeSeat:number; nightMode:'first'|'other'; nightFocusMode:boolean; completedSteps:string[];
   gameStarted:boolean; gamePhase:GamePhase; dayNumber:number; gameLog:LogEntry[]; demonBluffs:(string|null)[];
   abilityTargets?:Record<string,number[]>; automaticPoisonSeat?:number|null; ringRotation?:number; drunkFakeRoleId?:string|null;
-  announcedDeadSeats?:number[]; lastDawnDeadSeats?:number[]; openingStyle?:'long'|'short';
+  announcedDeadSeats?:number[]; lastDawnDeadSeats?:number[]; openingStyle?:'long'|'short'; roleCopies?:Record<string,number>; setupChoices?:Record<string,number>;
 };
 
 type NarrationScene = 'opening'|'nightfall'|'dawn'|'discussion'|'nomination'|'silence'|'execution'|'tie'|'lastWords'|'demonReveal'|'goodWin'|'evilWin';
@@ -54,21 +55,28 @@ const nightTargetCounts: Record<string,number> = {
   noble:3, innkeeper:2, investigator:2, grandmother:1, 'fortune-teller':2, barber:2, farmer:1,
   'toy-maker':3, 'trolley-problem':3, 'black-sun':3, 'hadi-jiya':3,
   seamstress:2, witch:1, 'evil-twin':1, sage:2, 'no-dashii':1, vortox:1,
+  'cat-army':1, puck:1, 'magic-cat':1, empath:2, monk:1, assassin:1,
   imp:1, vigormortis:1, 'fang-gu':1,
 };
 
 const makeSeats = (count: number): Seat[] => Array.from({ length: count }, (_, index) => ({ number: index + 1, roleId: null, alive: true, statuses: [] }));
-const setupRoleIds = new Set(['balloonist','fang-gu','vigormortis']);
-const setupModifiers = (roleIds: Set<string>) => [
-  roleIds.has('balloonist') ? { id:'balloonist', label:'气球驾驶员：镇民 −1 · 外来者 +1', outsiderDelta:1 } : null,
-  roleIds.has('fang-gu') ? { id:'fang-gu', label:'方古：镇民 −1 · 外来者 +1', outsiderDelta:1 } : null,
-  roleIds.has('vigormortis') ? { id:'vigormortis', label:'亡骨魔：镇民 +1 · 外来者 −1', outsiderDelta:-1 } : null,
-].filter((item): item is { id:string; label:string; outsiderDelta:number } => Boolean(item));
-const withSetupAdjustments = (quota: Record<Alignment, number>, roleIds: Set<string>): Record<Alignment, number> => {
-  const requestedDelta = setupModifiers(roleIds).reduce((total,item) => total + item.outsiderDelta,0);
+const setupDeltaLabel = (role:Role, delta:number) => delta === 0
+  ? `${role.name}：名额不变`
+  : delta > 0 ? `${role.name}：镇民 −${delta} · 外来者 +${delta}` : `${role.name}：镇民 +${Math.abs(delta)} · 外来者 −${Math.abs(delta)}`;
+const setupModifiers = (roles:Role[], roleIds:Set<string>, choices:Record<string,number>) => roles.flatMap((role) => {
+  if (!roleIds.has(role.id)) return [];
+  const rule = role.setupRules?.outsiderDelta;
+  if (!rule) return role.setupRules?.requiresNoEvil ? [{ id:role.id,label:`${role.name}：无邪恶角色`,outsiderDelta:0 }] : [];
+  const outsiderDelta = rule.options.includes(choices[role.id]) ? choices[role.id] : rule.default;
+  return [{ id:role.id, label:setupDeltaLabel(role,outsiderDelta), outsiderDelta }];
+});
+const withSetupAdjustments = (quota: Record<Alignment, number>, roles:Role[], roleIds: Set<string>, choices:Record<string,number>): Record<Alignment, number> => {
+  const requestedDelta = setupModifiers(roles,roleIds,choices).reduce((total,item) => total + item.outsiderDelta,0);
   const outsider = Math.max(0,quota.outsider + requestedDelta);
   const appliedDelta = outsider - quota.outsider;
-  return { ...quota, townsfolk:Math.max(0,quota.townsfolk - appliedDelta), outsider };
+  const adjusted = { ...quota, townsfolk:Math.max(0,quota.townsfolk - appliedDelta), outsider };
+  if (roles.some((role) => roleIds.has(role.id) && role.setupRules?.requiresNoEvil)) return { ...adjusted,townsfolk:adjusted.townsfolk + adjusted.minion + adjusted.demon,minion:0,demon:0 };
+  return adjusted;
 };
 const shuffled = <T,>(items: T[]) => {
   const result = [...items];
@@ -81,10 +89,10 @@ const shuffled = <T,>(items: T[]) => {
 
 function RoleIcon({ role, className = '' }: { role: Role; className?: string }) {
   if (role.glyph) return <span className={`role-icon role-glyph ${className}`} aria-hidden="true">{role.glyph}</span>;
-  return <img className={`role-icon ${className}`} src={`/roles/${role.id}.webp`} alt="" aria-hidden="true"/>;
+  return <img className={`role-icon ${className}`} src={publicAsset(`/roles/${role.id}.webp`)} alt="" aria-hidden="true"/>;
 }
 
-function RoleCard({ role, selected, locked, onSelect, onLock }: { role: Role; selected: boolean; locked: boolean; onSelect: () => void; onLock: () => void }) {
+function RoleCard({ role, selected, locked, copies, setupChoice, onSelect, onLock, onCopiesChange, onSetupChoiceChange }: { role: Role; selected: boolean; locked: boolean; copies:number; setupChoice?:number; onSelect: () => void; onLock: () => void; onCopiesChange:(count:number) => void; onSetupChoiceChange:(value:number) => void }) {
   const [expanded, setExpanded] = useState(false);
   return <article className={`role-card role-${role.alignment} ${selected ? 'is-selected' : ''} ${expanded ? 'is-expanded' : ''}`}>
     <div className="role-topline">
@@ -98,6 +106,10 @@ function RoleCard({ role, selected, locked, onSelect, onLock }: { role: Role; se
     <div className="role-details"><p>{role.ability}</p>
       <div className="role-foot">{role.setup && <span className="setup">配置：{role.setup}</span>}{role.note && <span className="data-note"><CircleHelp size={12}/>{role.note}</span>}</div>
     </div>
+    {selected && ((role.maxCopies ?? 1) > 1 || (role.setupRules?.outsiderDelta?.options.length ?? 0) > 1) && <div className="role-config-row">
+      {(role.maxCopies ?? 1) > 1 && <div className="copy-stepper"><span>在场数量</span><button onClick={() => onCopiesChange(copies - 1)} disabled={copies <= 1} aria-label={`减少${role.name}数量`}>−</button><b>{copies}</b><button onClick={() => onCopiesChange(copies + 1)} disabled={copies >= (role.maxCopies ?? 1)} aria-label={`增加${role.name}数量`}>＋</button></div>}
+      {(role.setupRules?.outsiderDelta?.options.length ?? 0) > 1 && <label className="setup-choice"><span>配置修正</span><NativeSelect value={setupChoice ?? role.setupRules!.outsiderDelta!.default} onChange={(event) => onSetupChoiceChange(Number(event.target.value))} aria-label={`${role.name}配置修正`}>{role.setupRules!.outsiderDelta!.options.map((delta) => <NativeSelectOption key={delta} value={delta}>{delta === 0 ? '名额不变' : delta > 0 ? `外来者 +${delta}` : `外来者 ${delta}`}</NativeSelectOption>)}</NativeSelect></label>}
+    </div>}
   </article>;
 }
 
@@ -240,14 +252,14 @@ function visibleNightSteps(steps: NightStep[], selected: Set<string>, seats: Sea
     if (step.skipWhenRolePresent && selected.has(step.skipWhenRolePresent)) return false;
     if (!step.roleId) return true;
     if (!selected.has(step.roleId)) return false;
-    const assignedSeat = seats.find((seat) => seat.roleId === step.roleId);
-    if (!assignedSeat) return step.deadMode !== 'only';
+    const assignedSeats = seats.filter((seat) => seat.roleId === step.roleId);
+    if (!assignedSeats.length) return step.deadMode !== 'only';
     const assignedRole = roles.find((role) => role.id === step.roleId);
-    if (assignedSeat.statuses.includes('noAbility')) return false;
-    if (assignedSeat.statuses.includes('abilityUsed') && assignedRole?.timing === '一次') return false;
+    const capableSeats = assignedSeats.filter((seat) => !seat.statuses.includes('noAbility') && !(seat.statuses.includes('abilityUsed') && assignedRole?.timing === '一次'));
+    if (!capableSeats.length) return false;
     if (step.deadMode === 'show') return true;
-    if (step.deadMode === 'only') return !assignedSeat.alive;
-    return assignedSeat.alive;
+    if (step.deadMode === 'only') return capableSeats.some((seat) => !seat.alive);
+    return capableSeats.some((seat) => seat.alive);
   });
 }
 
@@ -258,7 +270,7 @@ function nightStepDetail(step: NightStep, selected: Set<string>, roles: Role[], 
   return isDemonInfo && bluffNames.length ? `${poppyDemonInfo ? '罂粟种植者在场：不告知爪牙。' : step.note} 说书人展示给恶魔：${bluffNames.join('、')}。` : poppyDemonInfo ? '罂粟种植者在场：说书人只向恶魔展示三项伪装，不告知爪牙。' : step.note;
 }
 
-function nightStepSeatLabel(step: NightStep, selected: Set<string>, seats: Seat[], roles: Role[]) {
+function nightStepSeatLabel(step: NightStep, selected: Set<string>, seats: Seat[], roles: Role[], roleCopies:Record<string,number>) {
   const alignment = step.roleId ? roles.find((role) => role.id === step.roleId)?.alignment : step.requiredAlignment;
   const expectedRoles = step.roleId
     ? roles.filter((role) => role.id === step.roleId && selected.has(role.id))
@@ -266,20 +278,21 @@ function nightStepSeatLabel(step: NightStep, selected: Set<string>, seats: Seat[
   if (!expectedRoles.length) return null;
   const roleIds = new Set(expectedRoles.map((role) => role.id));
   const assigned = seats.filter((seat) => seat.roleId && roleIds.has(seat.roleId));
-  const unassignedCount = Math.max(0,expectedRoles.length - assigned.length);
+  const expectedCount = step.roleId ? Math.max(1,roleCopies[step.roleId] ?? 1) : expectedRoles.reduce((total,role) => total + Math.max(1,roleCopies[role.id] ?? 1),0);
+  const unassignedCount = Math.max(0,expectedCount - assigned.length);
   const assignedText = assigned.map((seat) => `${seat.number}号${seat.alive ? '' : '（死亡）'}`).join('、');
-  const missingText = unassignedCount ? expectedRoles.length === 1 ? '未入座' : `${unassignedCount}名未入座` : '';
+  const missingText = unassignedCount ? expectedCount === 1 ? '未入座' : `${unassignedCount}名未入座` : '';
   const text = [assignedText,missingText].filter(Boolean).join(' · ');
   return { text, alignment };
 }
 
-function NightList({ title, steps, selected, seats, roles, bluffs, completed, targets, onToggle, onTargetChange }: { title: string; steps: NightStep[]; selected: Set<string>; seats: Seat[]; roles: Role[]; bluffs: (string|null)[]; completed: Set<string>; targets:Record<string,number[]>; onToggle: (id: string) => void; onTargetChange:(step:NightStep,index:number,seatNumber:number|null) => void }) {
+function NightList({ title, steps, selected, seats, roles, roleCopies, bluffs, completed, targets, onToggle, onTargetChange }: { title: string; steps: NightStep[]; selected: Set<string>; seats: Seat[]; roles: Role[]; roleCopies:Record<string,number>; bluffs: (string|null)[]; completed: Set<string>; targets:Record<string,number[]>; onToggle: (id: string) => void; onTargetChange:(step:NightStep,index:number,seatNumber:number|null) => void }) {
   const visible = visibleNightSteps(steps, selected, seats, roles);
   return <section className="night-list">
     <div className="night-list-heading"><div><span className="eyebrow">WAKE ORDER</span><h3>{title}</h3></div><b>{visible.filter((step) => completed.has(step.id)).length} / {visible.length}</b></div>
     <ol>{visible.map((step, index) => {
       const assignedRole = nightActorRole(step,selected,roles);
-      const seatLabel = nightStepSeatLabel(step,selected,seats,roles);
+      const seatLabel = nightStepSeatLabel(step,selected,seats,roles,roleCopies);
       const actorSeat = nightActorSeat(step,selected,seats,roles);
       const impaired = actorSeat?.statuses.includes('poisoned') || actorSeat?.statuses.includes('drunk');
       const demonInfo = nightStepDetail(step, selected, roles, bluffs);
@@ -302,13 +315,13 @@ function NightList({ title, steps, selected, seats, roles, bluffs, completed, ta
   </section>;
 }
 
-function NightFocus({ title, steps, selected, seats, roles, bluffs, completed, targets, onToggle, onTargetChange }: { title:string; steps:NightStep[]; selected:Set<string>; seats:Seat[]; roles:Role[]; bluffs:(string|null)[]; completed:Set<string>; targets:Record<string,number[]>; onToggle:(id:string) => void; onTargetChange:(step:NightStep,index:number,seatNumber:number|null) => void }) {
+function NightFocus({ title, steps, selected, seats, roles, roleCopies, bluffs, completed, targets, onToggle, onTargetChange }: { title:string; steps:NightStep[]; selected:Set<string>; seats:Seat[]; roles:Role[]; roleCopies:Record<string,number>; bluffs:(string|null)[]; completed:Set<string>; targets:Record<string,number[]>; onToggle:(id:string) => void; onTargetChange:(step:NightStep,index:number,seatNumber:number|null) => void }) {
   const visible = visibleNightSteps(steps, selected, seats, roles);
   const currentIndex = visible.findIndex((step) => !completed.has(step.id));
   const current = currentIndex >= 0 ? visible[currentIndex] : undefined;
   if (!current) return <section className="night-focus night-focus-complete"><Check/><span className="eyebrow">{title}</span><h3>本轮夜序已完成</h3><p>所有需要处理的角色都已标记完成。</p></section>;
   const assignedRole = nightActorRole(current,selected,roles);
-  const seatLabel = nightStepSeatLabel(current,selected,seats,roles);
+  const seatLabel = nightStepSeatLabel(current,selected,seats,roles,roleCopies);
   const actorSeat = nightActorSeat(current,selected,seats,roles);
   const impaired = actorSeat?.statuses.includes('poisoned') || actorSeat?.statuses.includes('drunk');
   const detail = nightStepDetail(current, selected, roles, bluffs);
@@ -329,6 +342,8 @@ export default function BoardBuilder() {
   const [playerCount, setPlayerCount] = useState(10);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [locked, setLocked] = useState<Set<string>>(new Set());
+  const [roleCopies, setRoleCopies] = useState<Record<string,number>>({});
+  const [setupChoices, setSetupChoices] = useState<Record<string,number>>({});
   const [view, setView] = useState<ViewMode>('roles');
   const [seats, setSeats] = useState<Seat[]>(makeSeats(10));
   const [activeSeat, setActiveSeat] = useState(1);
@@ -358,14 +373,15 @@ export default function BoardBuilder() {
   const dragOverLogIdRef = useRef<string|null>(null);
   const script = scripts.find((item) => item.id === scriptId) ?? scripts[0];
   const baseQuota = script.counts[playerCount];
-  const activeSetupModifiers = useMemo(() => setupModifiers(selected), [selected]);
-  const quota = useMemo(() => withSetupAdjustments(baseQuota, selected), [baseQuota, selected]);
+  const activeSetupModifiers = useMemo(() => setupModifiers(script.roles,selected,setupChoices), [script.roles,selected,setupChoices]);
+  const quota = useMemo(() => withSetupAdjustments(baseQuota,script.roles, selected,setupChoices), [baseQuota,script.roles,selected,setupChoices]);
   const selectedRoles = script.roles.filter((role) => selected.has(role.id));
+  const selectedRoleInstances = useMemo(() => selectedRoles.flatMap((role) => Array.from({ length:Math.max(1,roleCopies[role.id] ?? 1) }, () => role)),[roleCopies,selectedRoles]);
   const drunkRole = script.roles.find((role) => role.id === 'drunk');
   const drunkFakeOptions = script.roles.filter((role) => role.alignment === 'townsfolk' && !selected.has(role.id) && !demonBluffs.includes(role.id));
   const availableBluffs = script.roles.filter((role) => (role.alignment === 'townsfolk' || (quota.outsider > 0 && role.alignment === 'outsider')) && !selected.has(role.id) && role.id !== drunkFakeRoleId);
   const activeSeatState = seats.find((seat) => seat.number === activeSeat) ?? seats[0];
-  const totals = useMemo(() => Object.fromEntries(alignments.map((alignment) => [alignment, selectedRoles.filter((role) => role.alignment === alignment).length])) as Record<Alignment, number>, [selectedRoles]);
+  const totals = useMemo(() => Object.fromEntries(alignments.map((alignment) => [alignment, selectedRoles.filter((role) => role.alignment === alignment).reduce((total,role) => total + Math.max(1,roleCopies[role.id] ?? 1),0)])) as Record<Alignment, number>, [roleCopies,selectedRoles]);
   const targetMarks = useMemo(() => {
     const marks: Record<number,string[]> = {};
     for (const [stepId,targetSeats] of Object.entries(abilityTargets)) {
@@ -392,7 +408,18 @@ export default function BoardBuilder() {
         return { number:index + 1, roleId:seat?.roleId && roleIds.has(seat.roleId) ? seat.roleId : null, alive:seat?.alive !== false, statuses:Array.isArray(seat?.statuses) ? seat.statuses.filter((status) => seatStatuses.includes(status)) : [] };
       });
       setScriptId(savedScript.id); setPlayerCount(savedCount);
-      setSelected(new Set(Array.isArray(saved.selected) ? saved.selected.filter((id) => roleIds.has(id)) : []));
+      const restoredSelected = new Set(Array.isArray(saved.selected) ? saved.selected.filter((id) => roleIds.has(id)) : []);
+      setSelected(restoredSelected);
+      setRoleCopies(Object.fromEntries(savedScript.roles.filter((role) => restoredSelected.has(role.id)).map((role) => {
+        const savedCopies = Math.floor(Number(saved.roleCopies?.[role.id]) || 1);
+        return [role.id,Math.min(Math.max(1,savedCopies),role.maxCopies ?? 1)];
+      })));
+      setSetupChoices(Object.fromEntries(savedScript.roles.flatMap((role) => {
+        const rule = role.setupRules?.outsiderDelta;
+        if (!rule) return [];
+        const savedChoice = Number(saved.setupChoices?.[role.id]);
+        return [[role.id,rule.options.includes(savedChoice) ? savedChoice : rule.default]];
+      })));
       setLocked(new Set(Array.isArray(saved.locked) ? saved.locked.filter((id) => roleIds.has(id)) : []));
       setView(['roles','seats','night','history'].includes(saved.view ?? '') ? saved.view as ViewMode : 'roles');
       setSeats(restoredSeats); setActiveSeat(Math.min(Math.max(1,Number(saved.activeSeat) || 1),savedCount));
@@ -417,37 +444,27 @@ export default function BoardBuilder() {
       setOpeningStyle(saved.openingStyle === 'short' ? 'short' : 'long');
       return true;
     };
-    const load = async () => {
+    const load = () => {
       let localState: Partial<SavedGameState>|null = null;
-      let remoteState: Partial<SavedGameState>|null = null;
       try {
         const raw = window.localStorage?.getItem(localGameKey);
         if (raw) localState = JSON.parse(raw) as Partial<SavedGameState>;
       } catch { window.localStorage?.removeItem(localGameKey); }
-      try {
-        const response = await fetch('/api/game-history');
-        if (response.ok) {
-          const body = await response.json() as { state?:Partial<SavedGameState>|null };
-          remoteState = body.state ?? null;
-        }
-      } catch { /* Local backup remains available when offline. */ }
-      const latest = (remoteState?.savedAt ?? 0) > (localState?.savedAt ?? 0) ? remoteState : localState ?? remoteState;
-      if (latest) restore(latest);
+      if (localState) restore(localState);
       if (!cancelled) setHistoryReady(true);
     };
-    void load();
+    load();
     return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
     if (!historyReady) return;
     const timer = window.setTimeout(() => {
-      const state: SavedGameState = { version:7, savedAt:Date.now(), scriptId, playerCount, selected:[...selected], locked:[...locked], view, seats, activeSeat, nightMode, nightFocusMode, completedSteps:[...completedSteps], abilityTargets, automaticPoisonSeat, gameStarted, gamePhase, dayNumber, gameLog, demonBluffs, ringRotation, drunkFakeRoleId, announcedDeadSeats:[...announcedDeadSeats], lastDawnDeadSeats:narrationSeats, openingStyle };
-      try { window.localStorage?.setItem(localGameKey,JSON.stringify(state)); } catch { /* Database backup remains available. */ }
-      void fetch('/api/game-history',{ method:'PUT', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ state }) }).catch(() => undefined);
+      const state: SavedGameState = { version:8, savedAt:Date.now(), scriptId, playerCount, selected:[...selected], locked:[...locked], roleCopies, setupChoices, view, seats, activeSeat, nightMode, nightFocusMode, completedSteps:[...completedSteps], abilityTargets, automaticPoisonSeat, gameStarted, gamePhase, dayNumber, gameLog, demonBluffs, ringRotation, drunkFakeRoleId, announcedDeadSeats:[...announcedDeadSeats], lastDawnDeadSeats:narrationSeats, openingStyle };
+      try { window.localStorage?.setItem(localGameKey,JSON.stringify(state)); } catch { /* Storage may be unavailable in private browsing. */ }
     }, 180);
     return () => window.clearTimeout(timer);
-  }, [abilityTargets, activeSeat, announcedDeadSeats, automaticPoisonSeat, completedSteps, dayNumber, demonBluffs, drunkFakeRoleId, gameLog, gamePhase, gameStarted, historyReady, locked, narrationSeats, nightFocusMode, nightMode, openingStyle, playerCount, ringRotation, scriptId, seats, selected, view]);
+  }, [abilityTargets, activeSeat, announcedDeadSeats, automaticPoisonSeat, completedSteps, dayNumber, demonBluffs, drunkFakeRoleId, gameLog, gamePhase, gameStarted, historyReady, locked, narrationSeats, nightFocusMode, nightMode, openingStyle, playerCount, ringRotation, roleCopies, scriptId, seats, selected, setupChoices, view]);
 
   useEffect(() => {
     setDemonBluffs((current) => current.map((id) => {
@@ -471,10 +488,10 @@ export default function BoardBuilder() {
     result.push(!mismatches.length ? { type:'ok', text:'阵营名额已配齐，可以进入座位安排。' } : { type:'info', text:`还需调整：${mismatches.map((alignment) => `${alignmentMeta[alignment].short} ${totals[alignment]}/${quota[alignment]}`).join('、')}` });
     if (selected.has('damsel') && !selected.has('huntsman')) result.push({ type:'warn', text:'落难少女在场但没有巡山人；确认这是你想要的配置。' });
     if (selected.has('drunk')) result.push(drunkFakeRoleId ? { type:'ok', text:`酒鬼假身份已分配为${script.roles.find((role) => role.id === drunkFakeRoleId)?.name ?? '不在场镇民'}。` } : { type:'warn', text:'酒鬼在场，但当前没有可用的不在场镇民作为假身份。' });
-    if (selected.has('atheist') && selectedRoles.some((role) => role.alignment === 'minion' || role.alignment === 'demon')) result.push({ type:'warn', text:'无神论者要求没有邪恶角色在场，与当前选择冲突。' });
+    const noEvilRole = selectedRoles.find((role) => role.setupRules?.requiresNoEvil);
+    if (noEvilRole && selectedRoles.some((role) => role.alignment === 'minion' || role.alignment === 'demon')) result.push({ type:'warn', text:`${noEvilRole.name}要求没有邪恶角色在场，与当前选择冲突。` });
     activeSetupModifiers.forEach((modifier) => result.push({ type:'ok', text:`已应用${modifier.label.replace('：','配置：')}。` }));
     if (selected.has('marionette')) result.push({ type:'info', text:'提线木偶需要与恶魔邻座，安排座位时请检查。' });
-    if (selected.has('godfather')) result.push({ type:'info', text:'教父会让外来者数量 -1 或 +1；请按本局决定手动调整配板。' });
     if (selected.has('vortox')) result.push({ type:'warn', text:'涡流在场：所有镇民信息必须错误，而且每天必须有人被处决。' });
     if (selected.has('no-dashii')) result.push({ type:'info', text:'诺-达鲺在场：安排或换位后，重新检查其两侧最近的镇民并标记中毒。' });
     const assignedCount = seats.filter((seat) => seat.roleId).length;
@@ -489,32 +506,53 @@ export default function BoardBuilder() {
   function resetRoundState() { setSeats(makeSeats(playerCount)); setActiveSeat(1); setCompletedSteps(new Set()); setAbilityTargets({}); setAutomaticPoisonSeat(null); setGameStarted(false); setGamePhase('firstNight'); setDayNumber(1); setGameLog([]); setAnnouncedDeadSeats(new Set()); setNarrationSeats([]); }
   function toggleRole(role: Role) {
     if (locked.has(role.id)) return;
+    const removing = selected.has(role.id);
     setSelected((current) => { const next = new Set(current); next.has(role.id) ? next.delete(role.id) : next.add(role.id); return next; });
+    setRoleCopies((current) => { const next = { ...current }; if (removing) delete next[role.id]; else next[role.id] = 1; return next; });
+    if (!removing && role.setupRules?.outsiderDelta) setSetupChoices((current) => ({ ...current, [role.id]:role.setupRules!.outsiderDelta!.default }));
     setSeats((current) => current.map((seat) => seat.roleId === role.id ? { ...seat, roleId:null } : seat));
     setCompletedSteps(new Set());
   }
   function toggleLock(role: Role) {
     setLocked((current) => { const next = new Set(current); next.has(role.id) ? next.delete(role.id) : next.add(role.id); return next; });
     setSelected((current) => new Set(current).add(role.id));
+    setRoleCopies((current) => ({ ...current, [role.id]:Math.max(1,current[role.id] ?? 1) }));
+    if (role.setupRules?.outsiderDelta) setSetupChoices((current) => ({ ...current, [role.id]:current[role.id] ?? role.setupRules!.outsiderDelta!.default }));
+  }
+  function changeRoleCopies(role:Role, requested:number) {
+    const count = Math.min(Math.max(1,requested),role.maxCopies ?? 1);
+    setRoleCopies((current) => ({ ...current,[role.id]:count }));
+    setSeats((current) => {
+      let kept = 0;
+      return current.map((seat) => seat.roleId !== role.id ? seat : ++kept <= count ? seat : { ...seat,roleId:null });
+    });
+    setCompletedSteps(new Set());
+  }
+  function changeSetupChoice(role:Role, value:number) {
+    const rule = role.setupRules?.outsiderDelta;
+    if (!rule?.options.includes(value)) return;
+    setSetupChoices((current) => ({ ...current,[role.id]:value }));
+    setCompletedSteps(new Set());
   }
   function buildBoard(random: boolean) {
     const next = new Set(locked);
+    const nextCopies:Record<string,number> = Object.fromEntries([...locked].map((id) => [id,Math.max(1,roleCopies[id] ?? 1)]));
+    const alignmentCount = (alignment:Alignment) => script.roles.filter((role) => role.alignment === alignment && next.has(role.id)).reduce((total,role) => total + Math.max(1,nextCopies[role.id] ?? 1),0);
     const addToAlignment = (alignment: Alignment, target: number) => {
       const candidates = script.roles.filter((role) => role.alignment === alignment && !next.has(role.id));
-      const already = script.roles.filter((role) => role.alignment === alignment && next.has(role.id)).length;
       const pool = random ? shuffled(candidates) : candidates;
-      pool.slice(0, Math.max(0, target - already)).forEach((role) => next.add(role.id));
+      pool.slice(0, Math.max(0, target - alignmentCount(alignment))).forEach((role) => { next.add(role.id); nextCopies[role.id] = 1; });
     };
 
     alignments.forEach((alignment) => addToAlignment(alignment,baseQuota[alignment]));
-    const targetQuota = withSetupAdjustments(baseQuota,next);
+    const targetQuota = withSetupAdjustments(baseQuota,script.roles,next,setupChoices);
     alignments.forEach((alignment) => {
-      const removable = (random ? shuffled(script.roles) : [...script.roles]).filter((role) => role.alignment === alignment && next.has(role.id) && !locked.has(role.id) && !setupRoleIds.has(role.id));
-      while (script.roles.filter((role) => role.alignment === alignment && next.has(role.id)).length > targetQuota[alignment] && removable.length) next.delete(removable.pop()!.id);
+      const removable = (random ? shuffled(script.roles) : [...script.roles]).filter((role) => role.alignment === alignment && next.has(role.id) && !locked.has(role.id) && !role.setupRules?.outsiderDelta);
+      while (alignmentCount(alignment) > targetQuota[alignment] && removable.length) { const role = removable.pop()!; next.delete(role.id); delete nextCopies[role.id]; }
       addToAlignment(alignment,targetQuota[alignment]);
     });
     const bluffPool = script.roles.filter((role) => (role.alignment === 'townsfolk' || (targetQuota.outsider > 0 && role.alignment === 'outsider')) && !next.has(role.id));
-    setDrunkFakeRoleId(null); setSelected(next); setDemonBluffs(shuffled(bluffPool).slice(0,3).map((role) => role.id)); setSeats(makeSeats(playerCount)); setCompletedSteps(new Set()); setAbilityTargets({}); setAutomaticPoisonSeat(null);
+    setDrunkFakeRoleId(null); setSelected(next); setRoleCopies(nextCopies); setDemonBluffs(shuffled(bluffPool).slice(0,3).map((role) => role.id)); setSeats(makeSeats(playerCount)); setCompletedSteps(new Set()); setAbilityTargets({}); setAutomaticPoisonSeat(null);
   }
   function changePlayerCount(count: number) {
     setPlayerCount(count);
@@ -524,7 +562,7 @@ export default function BoardBuilder() {
     setCompletedSteps(new Set()); setAbilityTargets((current) => Object.fromEntries(Object.entries(current).map(([key,values]) => [key,values.filter((value) => value <= count)]))); setAutomaticPoisonSeat((current) => current && current <= count ? current : null);
   }
   function changeScript(id: string) {
-    setScriptId(id); setSelected(new Set()); setLocked(new Set()); setDemonBluffs([null,null,null]); setDrunkFakeRoleId(null); setSeats(makeSeats(playerCount)); setActiveSeat(1); setCompletedSteps(new Set()); setAbilityTargets({}); setAutomaticPoisonSeat(null); setGameStarted(false); setGamePhase('firstNight'); setDayNumber(1); setGameLog([]); setAnnouncedDeadSeats(new Set()); setNarrationSeats([]); setRingRotation(0); setView('roles');
+    setScriptId(id); setSelected(new Set()); setLocked(new Set()); setRoleCopies({}); setSetupChoices({}); setDemonBluffs([null,null,null]); setDrunkFakeRoleId(null); setSeats(makeSeats(playerCount)); setActiveSeat(1); setCompletedSteps(new Set()); setAbilityTargets({}); setAutomaticPoisonSeat(null); setGameStarted(false); setGamePhase('firstNight'); setDayNumber(1); setGameLog([]); setAnnouncedDeadSeats(new Set()); setNarrationSeats([]); setRingRotation(0); setView('roles');
   }
   function randomizeBluffs() {
     setDemonBluffs(shuffled(availableBluffs).slice(0,3).map((role) => role.id));
@@ -540,14 +578,16 @@ export default function BoardBuilder() {
     const currentSeat = seats.find((seat) => seat.number === seatNumber);
     const oldRole = script.roles.find((role) => role.id === currentSeat?.roleId);
     const newRole = script.roles.find((role) => role.id === roleId);
-    setSeats((current) => current.map((seat) => {
-      if (roleId && seat.roleId === roleId) return { ...seat, roleId:null };
-      return seat.number === seatNumber ? { ...seat, roleId } : seat;
-    }));
+    setSeats((current) => {
+      const allowedCopies = roleId ? Math.max(1,roleCopies[roleId] ?? 1) : 1;
+      const assignedSeats = roleId ? current.filter((item) => item.roleId === roleId && item.number !== seatNumber) : [];
+      const seatToClear = assignedSeats.length >= allowedCopies ? assignedSeats[0]?.number : null;
+      return current.map((seat) => seat.number === seatToClear ? { ...seat,roleId:null } : seat.number === seatNumber ? { ...seat, roleId } : seat);
+    });
     if (gameStarted && oldRole?.id !== newRole?.id) addLog('role', `${seatNumber}号身份${oldRole ? '发生变化' : '已设置'}`, `${oldRole?.name ?? '未分配'} → ${newRole?.name ?? '未分配'}`);
   }
   function randomizeSeats() {
-    const roles = shuffled(selectedRoles);
+    const roles = shuffled(selectedRoleInstances);
     setSeats((current) => current.map((seat, index) => ({ ...seat, roleId:roles[index]?.id ?? null, alive:true, statuses:[] })));
     setAbilityTargets({}); setAutomaticPoisonSeat(null);
   }
@@ -759,11 +799,11 @@ export default function BoardBuilder() {
     : gamePhase === 'day' ? dawnText : narrationText.nightfall;
   const currentStageCueTitle = !gameStarted ? '游戏开场' : gamePhase === 'firstNight' ? '第1夜 · 游戏开场' : gamePhase === 'day' ? `${phaseName(gamePhase,dayNumber)} · 天亮破晓` : `${phaseName(gamePhase,dayNumber)} · 暮色入夜`;
 
-  if (!historyReady) return <main className="game-restoring"><span className="brand-mark"><span>血</span></span><p>正在恢复本局…</p></main>;
+  if (!historyReady) return <main className="game-restoring"><span className="brand-mark"><img src={publicAsset('/brand-mark.svg')} alt=""/></span><p>正在恢复本局…</p></main>;
 
   return <main className="app-shell">
     <header className="topbar">
-      <div className="brand-mark"><span>血</span></div><div className="brand-copy"><p>STORYTELLER DESK</p><h1>说书人配板台</h1></div>
+      <div className="brand-mark"><img src={publicAsset('/brand-mark.svg')} alt="说书人配板台徽标"/></div><div className="brand-copy"><p>STORYTELLER DESK</p><h1>说书人配板台</h1></div>
       <div className="header-controls">
         <label><span>板子 / 剧本</span><NativeSelect value={scriptId} onChange={(event) => changeScript(event.target.value)} aria-label="选择剧本">{scripts.map((item) => <NativeSelectOption key={item.id} value={item.id}>{item.name}</NativeSelectOption>)}</NativeSelect></label>
         <label><span>玩家人数</span><NativeSelect value={playerCount} onChange={(event) => changePlayerCount(Number(event.target.value))} aria-label="玩家人数">{Object.keys(script.counts).map((count) => <NativeSelectOption key={count} value={count}>{count} 人</NativeSelectOption>)}</NativeSelect></label>
@@ -791,11 +831,11 @@ export default function BoardBuilder() {
           <div className="role-builder-layout">
             <Tabs defaultValue="townsfolk" className="role-tabs">
               <TabsList className="alignment-tabs" aria-label="按阵营浏览角色">{alignments.map((alignment) => <TabsTrigger key={alignment} value={alignment}>{alignmentMeta[alignment].short}<span>{script.roles.filter((role) => role.alignment === alignment).length}</span></TabsTrigger>)}</TabsList>
-              {alignments.map((alignment) => <TabsContent key={alignment} value={alignment}><div className="section-title"><h3>{alignmentMeta[alignment].label}</h3><p>勾选加入当前配板，锁定后随机配板会保留该角色。</p></div><div className="role-grid">{script.roles.filter((role) => role.alignment === alignment).map((role) => <RoleCard key={role.id} role={role} selected={selected.has(role.id)} locked={locked.has(role.id)} onSelect={() => toggleRole(role)} onLock={() => toggleLock(role)}/>)}</div></TabsContent>)}
+              {alignments.map((alignment) => <TabsContent key={alignment} value={alignment}><div className="section-title"><h3>{alignmentMeta[alignment].label}</h3><p>勾选加入当前配板，锁定后随机配板会保留该角色。</p></div><div className="role-grid">{script.roles.filter((role) => role.alignment === alignment).map((role) => <RoleCard key={role.id} role={role} selected={selected.has(role.id)} locked={locked.has(role.id)} copies={Math.max(1,roleCopies[role.id] ?? 1)} setupChoice={setupChoices[role.id]} onSelect={() => toggleRole(role)} onLock={() => toggleLock(role)} onCopiesChange={(count) => changeRoleCopies(role,count)} onSetupChoiceChange={(value) => changeSetupChoice(role,value)}/>)}</div></TabsContent>)}
             </Tabs>
             <aside className="board-panel">
-              <div className="board-heading"><div><span className="eyebrow">LIVE BOARD</span><h2>当前配板</h2></div><span className="total-count">{selectedRoles.length}<small>/{playerCount}</small></span></div>
-              <div className="board-actions"><Button className="random-board" onClick={() => buildBoard(true)}><Dice5/>随机配板</Button><Button variant="outline" onClick={() => buildBoard(false)}><Sparkles/>按名额补齐</Button><Button variant="outline" onClick={() => { setSelected(new Set(locked)); resetRoundState(); }}><RotateCcw/>清空未锁定</Button></div>
+              <div className="board-heading"><div><span className="eyebrow">LIVE BOARD</span><h2>当前配板</h2></div><span className="total-count">{selectedRoleInstances.length}<small>/{playerCount}</small></span></div>
+              <div className="board-actions"><Button className="random-board" onClick={() => buildBoard(true)}><Dice5/>随机配板</Button><Button variant="outline" onClick={() => buildBoard(false)}><Sparkles/>按名额补齐</Button><Button variant="outline" onClick={() => { setSelected(new Set(locked)); setRoleCopies(Object.fromEntries([...locked].map((id) => [id,Math.max(1,roleCopies[id] ?? 1)]))); resetRoundState(); }}><RotateCcw/>清空未锁定</Button></div>
               {selected.has('drunk') && drunkRole && <section className="drunk-fake-role"><div className="drunk-fake-heading"><RoleIcon role={drunkRole}/><span><b>酒鬼的假身份</b><small>自动从不在场镇民中选择，并避开恶魔伪装</small></span><button onClick={randomizeDrunkFakeRole} disabled={!drunkFakeOptions.length}><Shuffle/>换一个</button></div><NativeSelect value={drunkFakeRoleId ?? ''} onChange={(event) => setDrunkFakeRoleId(event.target.value || null)} aria-label="酒鬼的假身份"><NativeSelectOption value="">暂无可用镇民</NativeSelectOption>{drunkFakeOptions.map((role) => <NativeSelectOption key={role.id} value={role.id}>{role.name}</NativeSelectOption>)}</NativeSelect></section>}
               <section className="demon-bluffs"><div className="bluff-heading"><div><EyeOff/><span><b>给恶魔的三个伪装</b><small>按当前阵营名额筛选不在场身份；外来者名额为 0 时只提供镇民</small></span></div><button onClick={randomizeBluffs} disabled={!selectedRoles.some((role) => role.alignment === 'demon') || availableBluffs.length < 3}><Shuffle/>随机准备</button></div>
                 {selectedRoles.some((role) => role.alignment === 'demon') ? <div className="bluff-slots">{demonBluffs.map((roleId,index) => {
@@ -804,7 +844,7 @@ export default function BoardBuilder() {
                   return <label className="bluff-slot" key={index}><span>{role ? <RoleIcon role={role}/> : <b>{index + 1}</b>}</span><NativeSelect value={roleId ?? ''} onChange={(event) => setBluff(index,event.target.value || null)} aria-label={`说书人准备的第${index + 1}个伪装`}><NativeSelectOption value="">说书人选择</NativeSelectOption>{options.map((item) => <NativeSelectOption key={item.id} value={item.id}>{item.name} · {alignmentMeta[item.alignment].short}</NativeSelectOption>)}</NativeSelect></label>;
                 })}</div> : <p className="bluff-empty">选入恶魔后，由说书人在这里准备身份；随机配板会自动准备三个不在场的善良角色。</p>}
               </section>
-              <div className="selected-groups">{alignments.map((alignment) => <section key={alignment} className={`selected-group group-${alignment}`}><div><span>{alignmentMeta[alignment].short}</span><b>{totals[alignment]} / {quota[alignment]}</b></div><ul>{selectedRoles.filter((role) => role.alignment === alignment).map((role) => <li key={role.id}><RoleIcon role={role} className="mini-role-icon"/>{role.name}{locked.has(role.id) && <Lock size={11}/>}</li>)}</ul>{!totals[alignment] && <p>尚未选择</p>}</section>)}</div>
+              <div className="selected-groups">{alignments.map((alignment) => <section key={alignment} className={`selected-group group-${alignment}`}><div><span>{alignmentMeta[alignment].short}</span><b>{totals[alignment]} / {quota[alignment]}</b></div><ul>{selectedRoles.filter((role) => role.alignment === alignment).map((role) => <li key={role.id}><RoleIcon role={role} className="mini-role-icon"/>{role.name}{(roleCopies[role.id] ?? 1) > 1 && <b>×{roleCopies[role.id]}</b>}{locked.has(role.id) && <Lock size={11}/>}</li>)}</ul>{!totals[alignment] && <p>尚未选择</p>}</section>)}</div>
               <section className="validation"><h3><ShieldCheck size={17}/>基础校验</h3><div className="message-list">{messages.map((message,index) => <div key={`${message.text}-${index}`} className={`message message-${message.type}`}>{message.type === 'warn' ? <AlertTriangle size={15}/> : message.type === 'ok' ? <Check size={15}/> : <CircleHelp size={15}/>}<span>{message.text}</span></div>)}</div></section>
             </aside>
           </div>
@@ -819,7 +859,7 @@ export default function BoardBuilder() {
               ['discussion','开启公聊'],['nomination','玩家提名'],['silence','无人提名'],['execution','宣判处决'],['tie','平票'],['lastWords','遗言结束'],['demonReveal','恶魔自爆'],['goodWin','好人胜利'],['evilWin','邪恶胜利'],
             ] as [NarrationScene,string][]).map(([scene,label]) => <button key={scene} onClick={() => { if (scene === 'execution') setNarrationSeat(activeSeat); setNarrationScene(scene); }}>{label}</button>)}</div></footer>
           </section>
-          <div className="view-heading"><div><span className="eyebrow">GRIMOIRE SEATS</span><h3>环形座位魔典</h3><p>拖动圆桌空白处旋转视角；拖动座位卡到另一张卡可交换双方状态。</p></div><div><Button onClick={randomizeSeats} disabled={!selectedRoles.length}><Shuffle/>随机入座</Button><Button variant="outline" onClick={() => setRingRotation(0)} disabled={Math.abs(ringRotation) < 0.5}><RotateCcw/>方向归零</Button><Button variant="outline" onClick={() => setSeats(makeSeats(playerCount))}><Trash2/>清空座位</Button></div></div>
+          <div className="view-heading"><div><span className="eyebrow">GRIMOIRE SEATS</span><h3>环形座位魔典</h3><p>拖动圆桌空白处旋转视角；拖动座位卡到另一张卡可交换双方状态。</p></div><div><Button onClick={randomizeSeats} disabled={!selectedRoleInstances.length}><Shuffle/>随机入座</Button><Button variant="outline" onClick={() => setRingRotation(0)} disabled={Math.abs(ringRotation) < 0.5}><RotateCcw/>方向归零</Button><Button variant="outline" onClick={() => setSeats(makeSeats(playerCount))}><Trash2/>清空座位</Button></div></div>
           <SeatMap seats={seats} roles={script.roles} activeSeat={activeSeat} targetMarks={targetMarks} rotation={ringRotation} drunkFakeRoleId={drunkFakeRoleId} onRotationChange={setRingRotation} onSelect={setActiveSeat} onSwap={swapSeats}/>
           <div className="seat-editor">
             <div className="seat-editor-number"><span>{activeSeatState.number}</span><div><b>{activeSeatState.number}号座位</b><small>{activeSeatState.alive ? '当前存活' : '当前死亡'}</small></div></div>
@@ -834,8 +874,8 @@ export default function BoardBuilder() {
           <div className="night-rule-banner"><Moon/><div><strong>夜序已按主动能力过滤</strong><span>“每夜”包含首夜；“每夜*”从第二夜开始。死亡、失去能力及已使用的一次性角色会按规则自动跳过。</span></div></div>
           <div className="night-control-row"><div className="night-toggle"><button className={nightMode === 'first' ? 'is-active' : ''} onClick={() => setNightMode('first')}><Moon/>首个夜晚</button><button className={nightMode === 'other' ? 'is-active' : ''} onClick={() => setNightMode('other')}><Sunrise/>其他夜晚</button></div><div className="night-display-toggle"><button className={!nightFocusMode ? 'is-active' : ''} onClick={() => setNightFocusMode(false)}><List/>完整列表</button><button className={nightFocusMode ? 'is-active' : ''} onClick={() => setNightFocusMode(true)}><Maximize2/>专注模式</button></div></div>
           {nightFocusMode
-            ? <NightFocus title={nightMode === 'first' ? '首个夜晚' : '其他夜晚'} steps={script.nightOrder[nightMode]} selected={selected} seats={seats} roles={script.roles} bluffs={demonBluffs} completed={completedSteps} targets={abilityTargets} onToggle={toggleNightStep} onTargetChange={changeNightTarget}/>
-            : <NightList title={nightMode === 'first' ? '首个夜晚' : '其他夜晚'} steps={script.nightOrder[nightMode]} selected={selected} seats={seats} roles={script.roles} bluffs={demonBluffs} completed={completedSteps} targets={abilityTargets} onToggle={toggleNightStep} onTargetChange={changeNightTarget}/>}
+            ? <NightFocus title={nightMode === 'first' ? '首个夜晚' : '其他夜晚'} steps={script.nightOrder[nightMode]} selected={selected} seats={seats} roles={script.roles} roleCopies={roleCopies} bluffs={demonBluffs} completed={completedSteps} targets={abilityTargets} onToggle={toggleNightStep} onTargetChange={changeNightTarget}/>
+            : <NightList title={nightMode === 'first' ? '首个夜晚' : '其他夜晚'} steps={script.nightOrder[nightMode]} selected={selected} seats={seats} roles={script.roles} roleCopies={roleCopies} bluffs={demonBluffs} completed={completedSteps} targets={abilityTargets} onToggle={toggleNightStep} onTargetChange={changeNightTarget}/>}
           <p className="night-footnote">提示：中毒、醉酒、角色变化及自定义能力可能改变实际处理方式，说书人应结合当前场况判断。</p>
         </section>}
 

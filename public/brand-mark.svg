@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="钟楼">
+  <circle cx="32" cy="32" r="30" fill="#12353a" stroke="#d9b465" stroke-width="2"/>
+  <path d="M16 55h32v-5h-4V27h-7v-6l-5-13-5 13v6h-7v23h-4v5Z" fill="#e4bd6c"/>
+  <path d="M23 50V30h18v20H23Z" fill="#f6e9c9"/>
+  <circle cx="32" cy="36" r="7" fill="#12353a"/>
+  <circle cx="32" cy="36" r="5" fill="none" stroke="#f6e9c9" stroke-width="1.5"/>
+  <path d="M32 32v4l3 2" fill="none" stroke="#f6e9c9" stroke-width="2" stroke-linecap="round"/>
+  <path d="M29 50v-6a3 3 0 0 1 6 0v6" fill="#12353a"/>
+</svg>
