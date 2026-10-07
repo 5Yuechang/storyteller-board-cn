@@ -3,9 +3,9 @@ export type SetupRules = { outsiderDelta?: { options:number[]; default:number };
 export type Role = { id: string; name: string; alignment: Alignment; ability: string; glyph?: string; timing?: '首夜' | '每夜' | '每夜*' | '白天' | '被动' | '一次'; setup?: string; setupRules?:SetupRules; maxCopies?:number; note?: string; misinformation?: string[] };
 export type PlayerCount = Record<Alignment, number>;
 export type NightStep = { id: string; name: string; note: string; roleId?: string; phase?: '信息'|'行动'|'结算'; deadMode?: 'show'|'only'; requiredAlignment?: Alignment; skipWhenRolePresent?: string };
-export type ScriptDefinition = { id: string; name: string; author: string; playerRange: [number, number]; description: string; counts: Record<number, PlayerCount>; roles: Role[]; specialRules?: { name:string; description:string }[]; nightOrder: { first: NightStep[]; other: NightStep[] } };
+export type ScriptDefinition = { id: string; name: string; author: string; playerRange: [number, number]; description: string; counts: Record<number, PlayerCount>; roles: Role[]; specialRules?: { name:string; description:string }[]; nightOrder: { first: NightStep[]; other: NightStep[] }; custom?:boolean; sourceImage?:string };
 
-const standardCounts: Record<number, PlayerCount> = {
+export const standardCounts: Record<number, PlayerCount> = {
   7:{townsfolk:5,outsider:0,minion:1,demon:1}, 8:{townsfolk:5,outsider:1,minion:1,demon:1}, 9:{townsfolk:5,outsider:2,minion:1,demon:1},
   10:{townsfolk:7,outsider:0,minion:2,demon:1}, 11:{townsfolk:7,outsider:1,minion:2,demon:1}, 12:{townsfolk:7,outsider:2,minion:2,demon:1},
   13:{townsfolk:9,outsider:0,minion:3,demon:1}, 14:{townsfolk:9,outsider:1,minion:3,demon:1}, 15:{townsfolk:9,outsider:2,minion:3,demon:1},
