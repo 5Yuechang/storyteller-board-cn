@@ -1,14 +1,20 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Download, FileJson, ImagePlus, Save, Trash2, Upload, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Download, FileJson, ImagePlus, Save, SlidersHorizontal, Trash2, Upload, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
-import { alignmentMeta, scripts as builtInScripts, standardCounts, type Alignment, type NightStep, type Role, type ScriptDefinition } from '@/app/data/scripts';
+import { alignmentMeta, scripts as builtInScripts, standardCounts, type Alignment, type AutomationEffect, type NightStep, type Role, type RoleAutomation, type ScriptDefinition } from '@/app/data/scripts';
 
 const alignments: Alignment[] = ['townsfolk','outsider','minion','demon'];
 const timingOptions: Role['timing'][] = ['首夜','每夜','每夜*','白天','被动','一次'];
+const effectOptions:{ value:AutomationEffect; label:string }[] = [
+  { value:'record',label:'只记录，不自动结算' }, { value:'poisoned',label:'标记中毒' }, { value:'drunk',label:'标记醉酒' },
+  { value:'protected',label:'标记受保护' }, { value:'noAbility',label:'标记失去能力' }, { value:'death',label:'标记死亡' },
+  { value:'revive',label:'恢复存活' }, { value:'turnedGood',label:'标记转为善良' }, { value:'turnedEvil',label:'标记转为邪恶' },
+];
+const defaultAutomation = ():RoleAutomation => ({ configured:false,targetCount:0,effect:'record',expires:'manual' });
 const emptyText = ():Record<Alignment,string> => ({ townsfolk:'',outsider:'',minion:'',demon:'' });
 type BotcMeta = { id:'_meta'; name?:string; author?:string; firstNight?:string[]; otherNight?:string[]; bootlegger?:string[] };
 type BotcRole = { id?:string; name?:string; team?:string; ability?:string; image?:string; firstNight?:number; otherNight?:number; firstNightReminder?:string; otherNightReminder?:string; setup?:boolean };
@@ -20,10 +26,13 @@ const standardRoleFallbacks:Record<string,Role> = {
   plaguedoctor:{ id:'plaguedoctor',name:'瘟疫医生',alignment:'outsider',timing:'被动',glyph:'疫',ability:'如果你死亡，说书人会获得一个不在场爪牙的能力。' },
   baron:{ id:'baron',name:'男爵',alignment:'minion',timing:'被动',glyph:'爵',ability:'会有额外的外来者在场。',setup:'+2 外来者',setupRules:{outsiderDelta:{options:[2],default:2}} },
   scarletwoman:{ id:'scarletwoman',name:'红唇女郎',alignment:'minion',timing:'被动',glyph:'红',ability:'如果有五名或更多玩家存活且恶魔死亡，你会变成该恶魔。' },
+  exorcist:{ id:'exorcist',name:'驱魔人',alignment:'townsfolk',timing:'每夜*',glyph:'驱',ability:'每个夜晚*，你要选择一名玩家（与上个夜晚不同）：如果你选中了恶魔，他会得知你的角色，但他当晚不会因其自身能力而被唤醒。' },
 };
 const builtInRoleCatalog = new Map<string,Role>();
 for (const script of builtInScripts) for (const role of script.roles) if (!builtInRoleCatalog.has(role.id)) builtInRoleCatalog.set(role.id,role);
 for (const role of Object.values(standardRoleFallbacks)) builtInRoleCatalog.set(role.id,role);
+const builtInRoleNameCatalog = new Map<string,Role>();
+for (const role of builtInRoleCatalog.values()) if (!builtInRoleNameCatalog.has(role.name.trim())) builtInRoleNameCatalog.set(role.name.trim(),role);
 
 function safeId(value:string) {
   const latin = value.trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
@@ -35,7 +44,7 @@ function parseRoleLines(text:string, alignment:Alignment, scriptId:string):Role[
     const [nameRaw,abilityRaw,timingRaw,setupRaw] = line.split(/[｜|\t]/).map((part) => part?.trim());
     const name = nameRaw || `${alignmentMeta[alignment].short}${index + 1}`;
     const timing = timingOptions.includes(timingRaw as Role['timing']) ? timingRaw as Role['timing'] : '被动';
-    return { id:`${scriptId}-${alignment}-${index + 1}`, name, alignment, ability:abilityRaw || '能力说明待补充。', timing, setup:setupRaw || undefined, glyph:alignment === 'demon' ? '魔' : alignment === 'minion' ? '爪' : alignment === 'outsider' ? '外' : '民' };
+    return { id:`${scriptId}-${alignment}-${index + 1}`, name, alignment, ability:abilityRaw || '能力说明待补充。', timing, setup:setupRaw || undefined, automation:defaultAutomation(), glyph:alignment === 'demon' ? '魔' : alignment === 'minion' ? '爪' : alignment === 'outsider' ? '外' : '民' };
   });
 }
 
@@ -63,23 +72,27 @@ function convertBotcScript(value:unknown):ScriptDefinition|null {
   const objectRoles = new Map<string,BotcRole>();
   value.forEach((item) => { if (item && typeof item === 'object' && (item as BotcRole).id && (item as BotcRole).id !== '_meta') objectRoles.set((item as BotcRole).id!,item as BotcRole); });
   const roles:Role[] = [];
+  const roleAliases = new Map<string,Role>();
   const seen = new Set<string>();
   for (const item of value.slice(1)) {
     const source = typeof item === 'string' ? objectRoles.get(item) : item && typeof item === 'object' ? item as BotcRole : undefined;
     const id = typeof item === 'string' ? item : source?.id;
-    if (!id || seen.has(id) || id === 'bootlegger') continue;
-    const existing = builtInRoleCatalog.get(id);
+    if (!id || id === 'bootlegger') continue;
+    const existing = builtInRoleCatalog.get(id) ?? (source?.name ? builtInRoleNameCatalog.get(source.name.trim()) : undefined);
+    const roleId = existing?.id ?? id;
+    if (seen.has(roleId)) continue;
     const team = source?.team ?? existing?.alignment;
     if (!alignments.includes(team as Alignment)) continue;
     const role:Role = source ? {
-      id,name:source.name?.trim() || existing?.name || id,alignment:team as Alignment,
+      id:roleId,name:source.name?.trim() || existing?.name || id,alignment:team as Alignment,
       ability:source.ability?.trim() || existing?.ability || '能力说明待补充。',timing:botcTiming(source),
       image:source.image || existing?.image,glyph:source.image ? undefined : existing?.glyph,
       setup:source.setup ? '该角色会改变初始配置' : existing?.setup,setupRules:existing?.setupRules,
+      automation:existing ? existing.automation : defaultAutomation(),
     } : existing ? { ...existing } : { id,name:id,alignment:'townsfolk',ability:'未能在本机角色库中找到能力说明。',timing:'被动',glyph:'?' };
-    roles.push(role); seen.add(id);
+    roles.push(role); seen.add(roleId); roleAliases.set(id,role);
   }
-  const roleMap = new Map(roles.map((role) => [role.id,role]));
+  const roleMap = new Map([...roles.map((role) => [role.id,role] as const),...roleAliases]);
   const makeOrder = (ids:string[]|undefined,mode:'first'|'other'):NightStep[] => (ids ?? []).flatMap<NightStep>((id,index):NightStep[] => {
     if (id === 'dusk' || id === 'dawn') return [];
     if (id === 'minioninfo') return [{ id:`minion-info-${mode}`,name:'爪牙信息',note:'唤醒爪牙，让其互认并确认恶魔。',phase:'信息' as const,requiredAlignment:'minion' as const }];
@@ -87,7 +100,7 @@ function convertBotcScript(value:unknown):ScriptDefinition|null {
     const role = roleMap.get(id); if (!role) return [];
     const raw = objectRoles.get(id);
     const note = (mode === 'first' ? raw?.firstNightReminder : raw?.otherNightReminder) || role.ability;
-    return [{ id:`${id}-${mode}-${index}`,name:role.name,note,roleId:id,phase:(role.alignment === 'minion' || role.alignment === 'demon') ? '行动' as const : '信息' as const }];
+    return [{ id:`${id}-${mode}-${index}`,name:role.name,note,roleId:role.id,phase:(role.alignment === 'minion' || role.alignment === 'demon') ? '行动' as const : '信息' as const }];
   });
   const specialRules = [
     ...(meta.bootlegger ?? []).map((description,index) => ({ name:`私规 ${index + 1}`,description })),
@@ -113,6 +126,38 @@ function downloadScript(script:ScriptDefinition) {
   link.href = url; link.download = `${script.name}.json`; link.click(); URL.revokeObjectURL(url);
 }
 
+function withUnknownRoleAutomation(script:ScriptDefinition):ScriptDefinition {
+  return { ...script,roles:script.roles.map((role) => builtInRoleCatalog.has(role.id) || role.automation ? role : { ...role,automation:defaultAutomation() }) };
+}
+
+function RoleLogicEditor({ script, onChange }:{ script:ScriptDefinition; onChange:(script:ScriptDefinition)=>void }) {
+  const configurable = script.roles.filter((role) => role.automation);
+  const pending = configurable.filter((role) => !role.automation?.configured).length;
+  const update = (roleId:string, automation:RoleAutomation) => onChange({ ...script,roles:script.roles.map((role) => role.id === roleId ? { ...role,automation } : role) });
+  return <section className="role-logic-editor">
+    <div className="role-logic-intro">
+      <span className={pending ? 'is-pending' : 'is-ready'}>{pending ? <AlertTriangle/> : <CheckCircle2/>}</span>
+      <div><h3>检查新角色逻辑</h3><p>{pending ? `${pending} 个角色尚未配置，当前会安全地只显示技能说明。` : '所有新角色都已确认处理方式。'}</p></div>
+    </div>
+    <div className="role-logic-list">{configurable.map((role) => {
+      const automation = role.automation ?? defaultAutomation();
+      const statusEffect = ['poisoned','drunk','protected','noAbility','turnedGood','turnedEvil'].includes(automation.effect);
+      return <article key={role.id} className={automation.configured ? 'is-configured' : ''}>
+        <header><div><span>{alignmentMeta[role.alignment].short}</span><strong>{role.name}</strong></div><b>{automation.configured ? '已配置' : '待配置'}</b></header>
+        <p>{role.ability}</p>
+        <div className="role-logic-fields">
+          <div className="role-logic-field"><span>处理方式</span><NativeSelect value={automation.configured ? 'automatic' : 'manual'} onChange={(event) => update(role.id,{ ...automation,configured:event.target.value === 'automatic' })} aria-label={`${role.name}处理方式`}><NativeSelectOption value="manual">说书人手动处理</NativeSelectOption><NativeSelectOption value="automatic">按下方规则自动处理</NativeSelectOption></NativeSelect></div>
+          {automation.configured && <>
+            <div className="role-logic-field"><span>选择玩家</span><NativeSelect value={automation.targetCount} onChange={(event) => update(role.id,{ ...automation,targetCount:Number(event.target.value) })} aria-label={`${role.name}选择玩家数量`}>{[0,1,2,3].map((count) => <NativeSelectOption key={count} value={count}>{count ? `${count} 名` : '无需选择'}</NativeSelectOption>)}</NativeSelect></div>
+            <div className="role-logic-field"><span>自动效果</span><NativeSelect value={automation.effect} onChange={(event) => update(role.id,{ ...automation,effect:event.target.value as AutomationEffect })} aria-label={`${role.name}自动效果`}>{effectOptions.map((option) => <NativeSelectOption key={option.value} value={option.value}>{option.label}</NativeSelectOption>)}</NativeSelect></div>
+            {statusEffect && <div className="role-logic-field"><span>持续时间</span><NativeSelect value={automation.expires ?? 'manual'} onChange={(event) => update(role.id,{ ...automation,expires:event.target.value as RoleAutomation['expires'] })} aria-label={`${role.name}效果持续时间`}><NativeSelectOption value="manual">直到手动移除</NativeSelectOption><NativeSelectOption value="nextDusk">下个黄昏自动移除</NativeSelectOption></NativeSelect></div>}
+          </>}
+        </div>
+      </article>;
+    })}</div>
+  </section>;
+}
+
 export function ScriptLibraryDialog({ open, customScripts, currentScript, onClose, onSave, onDelete }:{ open:boolean; customScripts:ScriptDefinition[]; currentScript:ScriptDefinition; onClose:()=>void; onSave:(script:ScriptDefinition)=>void; onDelete:(id:string)=>void }) {
   const [name,setName] = useState('');
   const [minPlayers,setMinPlayers] = useState(7);
@@ -120,6 +165,7 @@ export function ScriptLibraryDialog({ open, customScripts, currentScript, onClos
   const [roleText,setRoleText] = useState<Record<Alignment,string>>(emptyText);
   const [sourceImage,setSourceImage] = useState('');
   const [error,setError] = useState('');
+  const [logicDraft,setLogicDraft] = useState<ScriptDefinition|null>(null);
   const [activeAlignment,setActiveAlignment] = useState<Alignment>('townsfolk');
   const fileRef = useRef<HTMLInputElement>(null);
   const jsonRef = useRef<HTMLInputElement>(null);
@@ -146,8 +192,10 @@ export function ScriptLibraryDialog({ open, customScripts, currentScript, onClos
       const native = !Array.isArray(value) && value && typeof value === 'object' ? value as ScriptDefinition : null;
       if (!converted && (!native?.name || !Array.isArray(native.roles) || !native.counts)) throw new Error('invalid');
       const base = converted ?? native!;
-      const script = { ...base,id:`custom-${safeId(base.name)}-${Date.now().toString(36)}`,custom:true,sourceImage:undefined };
-      onSave(script); setError(''); onClose();
+      const script = withUnknownRoleAutomation({ ...base,id:`custom-${safeId(base.name)}-${Date.now().toString(36)}`,custom:true,sourceImage:undefined });
+      onSave(script); setError('');
+      if (script.roles.some((role) => role.automation && !role.automation.configured)) setLogicDraft(script);
+      else onClose();
     } catch { setError('无法识别这个 JSON。支持标准《血染钟楼》剧本 JSON，以及本工具导出的 JSON。'); }
   }
 
@@ -162,6 +210,11 @@ export function ScriptLibraryDialog({ open, customScripts, currentScript, onClos
     onSave(script); onClose();
   }
 
+  function saveLogic() {
+    if (!logicDraft) return;
+    onSave(logicDraft); setLogicDraft(null); onClose();
+  }
+
   return <div className="script-dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="script-dialog" role="dialog" aria-modal="true" aria-labelledby="script-dialog-title">
       <header><div><span>本机剧本库</span><h2 id="script-dialog-title">导入新剧本</h2></div><button onClick={onClose} aria-label="关闭"><X/></button></header>
@@ -169,10 +222,11 @@ export function ScriptLibraryDialog({ open, customScripts, currentScript, onClos
         <aside className="script-library-list">
           <div><strong>已添加</strong><small>数据只保存在当前浏览器</small></div>
           {!customScripts.length && <p>还没有自定义剧本。</p>}
-          {customScripts.map((script) => <article key={script.id}><span><b>{script.name}</b><small>{script.roles.length} 个角色</small></span><div><button onClick={() => downloadScript(script)} aria-label={`导出${script.name}`}><Download/></button><button className="danger" onClick={() => onDelete(script.id)} aria-label={`删除${script.name}`}><Trash2/></button></div></article>)}
+          {customScripts.map((script) => { const pending = script.roles.filter((role) => role.automation && !role.automation.configured).length; return <article key={script.id}><span><b>{script.name}</b><small>{script.roles.length} 个角色{pending ? ` · ${pending} 个待配置` : ''}</small></span><div><button onClick={() => setLogicDraft(withUnknownRoleAutomation(script))} aria-label={`配置${script.name}角色逻辑`}><SlidersHorizontal/></button><button onClick={() => downloadScript(script)} aria-label={`导出${script.name}`}><Download/></button><button className="danger" onClick={() => onDelete(script.id)} aria-label={`删除${script.name}`}><Trash2/></button></div></article>; })}
           <Button variant="outline" onClick={() => downloadScript(currentScript)}><FileJson/>导出当前剧本 JSON</Button>
         </aside>
         <div className="script-import-form">
+          {logicDraft ? <RoleLogicEditor script={logicDraft} onChange={setLogicDraft}/> : <>
           <section className="script-source-row">
             <button className={`image-dropzone ${sourceImage ? 'has-image' : ''}`} onClick={() => fileRef.current?.click()}>
               {sourceImage ? <img src={sourceImage} alt="已选择的剧本参考图"/> : <><ImagePlus/><strong>选择剧本图片</strong><small>图片仅在本机压缩保存，供录入时对照</small></>}
@@ -191,9 +245,10 @@ export function ScriptLibraryDialog({ open, customScripts, currentScript, onClos
           </section>
           <div className="script-import-summary"><span>已识别 <b>{parsedRoles.length}</b> 个角色</span><span>{alignments.map((alignment) => `${alignmentMeta[alignment].short} ${parsedRoles.filter((role) => role.alignment === alignment).length}`).join(' · ')}</span></div>
           {error && <p className="script-import-error" role="alert">{error}</p>}
+          </>}
         </div>
       </div>
-      <footer><p>图片识别暂不自动猜角色，避免把角色名或能力识别错；录入后夜序会按“首夜 / 每夜”自动生成。</p><Button variant="outline" onClick={onClose}>取消</Button><Button onClick={saveDraft}><Save/>保存并切换</Button></footer>
+      <footer>{logicDraft ? <><p>未配置角色不会自动改变座位状态；技能说明和夜序仍可正常使用。</p><Button variant="outline" onClick={() => { setLogicDraft(null); onClose(); }}>稍后处理</Button><Button onClick={saveLogic}><Save/>保存角色逻辑</Button></> : <><p>图片识别暂不自动猜角色，避免把角色名或能力识别错；录入后夜序会按“首夜 / 每夜”自动生成。</p><Button variant="outline" onClick={onClose}>取消</Button><Button onClick={saveDraft}><Save/>保存并切换</Button></>}</footer>
     </section>
   </div>;
 }

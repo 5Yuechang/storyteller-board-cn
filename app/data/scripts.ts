@@ -1,6 +1,8 @@
 export type Alignment = 'townsfolk' | 'outsider' | 'minion' | 'demon';
 export type SetupRules = { outsiderDelta?: { options:number[]; default:number }; requiresNoEvil?:boolean };
-export type Role = { id: string; name: string; alignment: Alignment; ability: string; glyph?: string; image?:string; timing?: '首夜' | '每夜' | '每夜*' | '白天' | '被动' | '一次'; setup?: string; setupRules?:SetupRules; maxCopies?:number; note?: string; misinformation?: string[] };
+export type AutomationEffect = 'record'|'poisoned'|'drunk'|'protected'|'noAbility'|'death'|'revive'|'turnedGood'|'turnedEvil';
+export type RoleAutomation = { configured:boolean; targetCount:number; effect:AutomationEffect; expires?:'manual'|'nextDusk' };
+export type Role = { id: string; name: string; alignment: Alignment; ability: string; glyph?: string; image?:string; timing?: '首夜' | '每夜' | '每夜*' | '白天' | '被动' | '一次'; setup?: string; setupRules?:SetupRules; automation?:RoleAutomation; maxCopies?:number; note?: string; misinformation?: string[] };
 export type PlayerCount = Record<Alignment, number>;
 export type NightStep = { id: string; name: string; note: string; roleId?: string; phase?: '信息'|'行动'|'结算'; deadMode?: 'show'|'only'; requiredAlignment?: Alignment; skipWhenRolePresent?: string };
 export type ScriptDefinition = { id: string; name: string; author: string; playerRange: [number, number]; description: string; counts: Record<number, PlayerCount>; roles: Role[]; specialRules?: { name:string; description:string }[]; nightOrder: { first: NightStep[]; other: NightStep[] }; custom?:boolean; sourceImage?:string };

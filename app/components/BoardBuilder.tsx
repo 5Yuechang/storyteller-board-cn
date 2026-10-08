@@ -7,7 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { alignmentMeta, scripts, type Alignment, type NightStep, type Role, type ScriptDefinition } from '@/app/data/scripts';
+import { alignmentMeta, scripts, type Alignment, type AutomationEffect, type NightStep, type Role, type ScriptDefinition } from '@/app/data/scripts';
 import { ScriptLibraryDialog } from '@/app/components/ScriptLibraryDialog';
 
 const alignments: Alignment[] = ['townsfolk', 'outsider', 'minion', 'demon'];
@@ -18,11 +18,13 @@ type LogKind = 'system'|'death'|'status'|'role'|'night'|'note';
 type LogEntry = { id:string; dayNumber:number; phase:GamePhase; kind:LogKind; title:string; detail?:string; createdAt:number };
 type SeatStatus = 'poisoned'|'drunk'|'protected'|'noAbility'|'abilityUsed'|'turnedGood'|'turnedEvil';
 type Seat = { number: number; roleId: string | null; alive: boolean; statuses: SeatStatus[] };
+type AutomaticStatusEffect = { stepId:string; targetIndex:number; roleId:string; seatNumber:number; status:SeatStatus; expires:'manual'|'nextDusk' };
 type SavedGameState = {
   version:number; savedAt:number; scriptId:string; playerCount:number; selected:string[]; locked:string[]; view:ViewMode;
   seats:Seat[]; activeSeat:number; nightMode:'first'|'other'; nightFocusMode:boolean; completedSteps:string[];
   gameStarted:boolean; gamePhase:GamePhase; dayNumber:number; gameLog:LogEntry[]; demonBluffs:(string|null)[];
   abilityTargets?:Record<string,number[]>; automaticPoisonSeat?:number|null; ringRotation?:number; drunkFakeRoleId?:string|null;
+  automaticStatusEffects?:AutomaticStatusEffect[];
   announcedDeadSeats?:number[]; lastDawnDeadSeats?:number[]; openingStyle?:'long'|'short'; roleCopies?:Record<string,number>; setupChoices?:Record<string,number>;
 };
 
@@ -48,6 +50,8 @@ const seatStatusMeta: Record<SeatStatus, { label: string; short: string }> = {
   turnedGood:{label:'已转为善良',short:'善'}, turnedEvil:{label:'已转为邪恶',short:'恶'},
 };
 const seatStatuses = Object.keys(seatStatusMeta) as SeatStatus[];
+const automationEffectLabels:Record<AutomationEffect,string> = { record:'只记录',poisoned:'中毒',drunk:'醉酒',protected:'受保护',noAbility:'失去能力',death:'死亡',revive:'复活',turnedGood:'转为善良',turnedEvil:'转为邪恶' };
+const automationStatusEffects:Partial<Record<AutomationEffect,SeatStatus>> = { poisoned:'poisoned',drunk:'drunk',protected:'protected',noAbility:'noAbility',turnedGood:'turnedGood',turnedEvil:'turnedEvil' };
 const localGameKey = 'storyteller-board-current-game-v2';
 const customScriptsKey = 'storyteller-board-custom-scripts-v1';
 const phaseName = (phase: GamePhase, dayNumber: number) => `第${phase === 'firstNight' ? 1 : dayNumber}${phase === 'day' ? '天' : '夜'}`;
@@ -56,7 +60,7 @@ const nightTargetCounts: Record<string,number> = {
   dreamer:1, gambler:1, ravenkeeper:1, cerenovus:1, 'pit-hag':1, godfather:1, lunatic:1,
   noble:3, innkeeper:2, investigator:2, grandmother:1, 'fortune-teller':2, barber:2, farmer:1,
   'toy-maker':3, 'trolley-problem':3, 'black-sun':3, 'hadi-jiya':3,
-  seamstress:2, witch:1, 'evil-twin':1, sage:2, 'no-dashii':1, vortox:1,
+  seamstress:2, witch:1, exorcist:1, 'evil-twin':1, sage:2, 'no-dashii':1, vortox:1,
   'cat-army':1, puck:1, 'magic-cat':1, empath:2, monk:1, assassin:1,
   imp:1, vigormortis:1, 'fang-gu':1,
 };
@@ -102,6 +106,7 @@ function RoleCard({ role, selected, locked, copies, setupChoice, onSelect, onLoc
       <RoleIcon role={role}/>
       <button className="role-name" onClick={onSelect}>{role.name}</button>
       <span className="timing">{role.timing}</span>
+      {role.automation && <span className={`automation-state ${role.automation.configured ? 'is-ready' : 'is-manual'}`}>{role.automation.configured ? '自动' : '手动'}</span>}
       <button className="role-expand" onClick={() => setExpanded((open) => !open)} aria-expanded={expanded} aria-label={`${expanded ? '收起' : '查看'}${role.name}技能`}>{expanded ? <ChevronUp/> : <ChevronDown/>}</button>
       <button className={`lock-button ${locked ? 'is-locked' : ''}`} onClick={onLock} aria-label={`${locked ? '取消锁定' : '锁定'}${role.name}`} title={locked ? '取消锁定' : '锁定角色'}><Lock size={14}/></button>
     </div>
@@ -229,7 +234,8 @@ function nightActorSeat(step: NightStep, selected: Set<string>, seats: Seat[], r
 }
 
 function nightTargetCount(step: NightStep, selected: Set<string>, roles: Role[]) {
-  return nightTargetCounts[nightActorRole(step,selected,roles)?.id ?? ''] ?? 0;
+  const role = nightActorRole(step,selected,roles);
+  return role?.automation?.configured ? role.automation.targetCount : nightTargetCounts[role?.id ?? ''] ?? 0;
 }
 
 function NightTargetPicker({ step, selected, seats, roles, targets, onChange }: { step:NightStep; selected:Set<string>; seats:Seat[]; roles:Role[]; targets:number[]; onChange:(index:number, seatNumber:number|null) => void }) {
@@ -356,6 +362,7 @@ export default function BoardBuilder() {
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
   const [abilityTargets, setAbilityTargets] = useState<Record<string,number[]>>({});
   const [automaticPoisonSeat, setAutomaticPoisonSeat] = useState<number|null>(null);
+  const [automaticStatusEffects, setAutomaticStatusEffects] = useState<AutomaticStatusEffect[]>([]);
   const [gameStarted, setGameStarted] = useState(false);
   const [gamePhase, setGamePhase] = useState<GamePhase>('firstNight');
   const [dayNumber, setDayNumber] = useState(1);
@@ -432,6 +439,7 @@ export default function BoardBuilder() {
       setCompletedSteps(new Set(Array.isArray(saved.completedSteps) ? saved.completedSteps : []));
       const restoredTargets = Object.fromEntries(Object.entries(saved.abilityTargets ?? {}).map(([key,values]) => [key,Array.isArray(values) ? values.filter((value) => Number.isInteger(value) && value >= 1 && value <= savedCount) : []]));
       setAbilityTargets(restoredTargets); setAutomaticPoisonSeat(Number.isInteger(saved.automaticPoisonSeat) && saved.automaticPoisonSeat! >= 1 && saved.automaticPoisonSeat! <= savedCount ? saved.automaticPoisonSeat! : null);
+      setAutomaticStatusEffects(Array.isArray(saved.automaticStatusEffects) ? saved.automaticStatusEffects.filter((effect) => effect.seatNumber >= 1 && effect.seatNumber <= savedCount && seatStatuses.includes(effect.status)) : []);
       setGameStarted(Boolean(saved.gameStarted)); setGamePhase(['firstNight','day','night'].includes(saved.gamePhase ?? '') ? saved.gamePhase! : 'firstNight');
       setDayNumber(Math.max(1,Number(saved.dayNumber) || 1));
       setGameLog(Array.isArray(saved.gameLog) ? saved.gameLog
@@ -472,11 +480,11 @@ export default function BoardBuilder() {
   useEffect(() => {
     if (!historyReady) return;
     const timer = window.setTimeout(() => {
-      const state: SavedGameState = { version:8, savedAt:Date.now(), scriptId, playerCount, selected:[...selected], locked:[...locked], roleCopies, setupChoices, view, seats, activeSeat, nightMode, nightFocusMode, completedSteps:[...completedSteps], abilityTargets, automaticPoisonSeat, gameStarted, gamePhase, dayNumber, gameLog, demonBluffs, ringRotation, drunkFakeRoleId, announcedDeadSeats:[...announcedDeadSeats], lastDawnDeadSeats:narrationSeats, openingStyle };
+      const state: SavedGameState = { version:9, savedAt:Date.now(), scriptId, playerCount, selected:[...selected], locked:[...locked], roleCopies, setupChoices, view, seats, activeSeat, nightMode, nightFocusMode, completedSteps:[...completedSteps], abilityTargets, automaticPoisonSeat, automaticStatusEffects, gameStarted, gamePhase, dayNumber, gameLog, demonBluffs, ringRotation, drunkFakeRoleId, announcedDeadSeats:[...announcedDeadSeats], lastDawnDeadSeats:narrationSeats, openingStyle };
       try { window.localStorage?.setItem(localGameKey,JSON.stringify(state)); } catch { /* Storage may be unavailable in private browsing. */ }
     }, 180);
     return () => window.clearTimeout(timer);
-  }, [abilityTargets, activeSeat, announcedDeadSeats, automaticPoisonSeat, completedSteps, dayNumber, demonBluffs, drunkFakeRoleId, gameLog, gamePhase, gameStarted, historyReady, locked, narrationSeats, nightFocusMode, nightMode, openingStyle, playerCount, ringRotation, roleCopies, scriptId, seats, selected, setupChoices, view]);
+  }, [abilityTargets, activeSeat, announcedDeadSeats, automaticPoisonSeat, automaticStatusEffects, completedSteps, dayNumber, demonBluffs, drunkFakeRoleId, gameLog, gamePhase, gameStarted, historyReady, locked, narrationSeats, nightFocusMode, nightMode, openingStyle, playerCount, ringRotation, roleCopies, scriptId, seats, selected, setupChoices, view]);
 
   useEffect(() => {
     setDemonBluffs((current) => current.map((id) => {
@@ -571,12 +579,12 @@ export default function BoardBuilder() {
     setSeats((current) => Array.from({ length:count }, (_, index) => current[index] ? { ...current[index], number:index + 1 } : { number:index + 1, roleId:null, alive:true, statuses:[] }));
     setActiveSeat((current) => Math.min(current, count));
     setAnnouncedDeadSeats((current) => new Set([...current].filter((seat) => seat <= count)));
-    setCompletedSteps(new Set()); setAbilityTargets((current) => Object.fromEntries(Object.entries(current).map(([key,values]) => [key,values.filter((value) => value <= count)]))); setAutomaticPoisonSeat((current) => current && current <= count ? current : null);
+    setCompletedSteps(new Set()); setAbilityTargets((current) => Object.fromEntries(Object.entries(current).map(([key,values]) => [key,values.filter((value) => value <= count)]))); setAutomaticPoisonSeat((current) => current && current <= count ? current : null); setAutomaticStatusEffects((current) => current.filter((effect) => effect.seatNumber <= count));
   }
   function changeScript(id: string, library = availableScripts) {
     const nextScript = library.find((item) => item.id === id) ?? scripts[0];
     const nextCount = nextScript.counts[playerCount] ? playerCount : Number(Object.keys(nextScript.counts)[0] ?? 7);
-    setScriptId(nextScript.id); setPlayerCount(nextCount); setSelected(new Set()); setLocked(new Set()); setRoleCopies({}); setSetupChoices({}); setDemonBluffs([null,null,null]); setDrunkFakeRoleId(null); setSeats(makeSeats(nextCount)); setActiveSeat(1); setCompletedSteps(new Set()); setAbilityTargets({}); setAutomaticPoisonSeat(null); setGameStarted(false); setGamePhase('firstNight'); setDayNumber(1); setGameLog([]); setAnnouncedDeadSeats(new Set()); setNarrationSeats([]); setRingRotation(0); setView('roles');
+    setScriptId(nextScript.id); setPlayerCount(nextCount); setSelected(new Set()); setLocked(new Set()); setRoleCopies({}); setSetupChoices({}); setDemonBluffs([null,null,null]); setDrunkFakeRoleId(null); setSeats(makeSeats(nextCount)); setActiveSeat(1); setCompletedSteps(new Set()); setAbilityTargets({}); setAutomaticPoisonSeat(null); setAutomaticStatusEffects([]); setGameStarted(false); setGamePhase('firstNight'); setDayNumber(1); setGameLog([]); setAnnouncedDeadSeats(new Set()); setNarrationSeats([]); setRingRotation(0); setView('roles');
   }
   function saveCustomScript(nextScript:ScriptDefinition) {
     const next = [...customScripts.filter((item) => item.id !== nextScript.id),nextScript];
@@ -681,6 +689,26 @@ export default function BoardBuilder() {
     else if (previous) addLog('night',`${actorRole?.name ?? step.name}清除技能目标`,`${previous}号玩家`,phase,gameStarted ? dayNumber : 1);
     if (seatNumber && actorImpaired) addLog('status',`${actorSeat?.number}号能力未生效`,`因${actorSeat?.statuses.includes('poisoned') ? '中毒' : '醉酒'}，${actorRole?.name ?? step.name}的本次选择只记录、不结算`,phase,gameStarted ? dayNumber : 1);
 
+    const automation = actorRole?.automation;
+    if (actorRole && automation?.configured && !actorImpaired) {
+      const status = automationStatusEffects[automation.effect];
+      const existingEffect = automaticStatusEffects.find((effect) => effect.stepId === step.id && effect.targetIndex === index);
+      if (status && existingEffect && existingEffect.seatNumber !== seatNumber) {
+        setSeats((current) => current.map((seat) => seat.number === existingEffect.seatNumber ? { ...seat,statuses:seat.statuses.filter((item) => item !== existingEffect.status) } : seat));
+      }
+      if (status && seatNumber) {
+        setSeats((current) => current.map((seat) => seat.number === seatNumber ? { ...seat,statuses:[...new Set([...seat.statuses,status])] } : seat));
+        setAutomaticStatusEffects((current) => [...current.filter((effect) => !(effect.stepId === step.id && effect.targetIndex === index)),{ stepId:step.id,targetIndex:index,roleId:actorRole.id,seatNumber,status,expires:automation.expires ?? 'manual' }]);
+      } else if (status) {
+        setAutomaticStatusEffects((current) => current.filter((effect) => !(effect.stepId === step.id && effect.targetIndex === index)));
+      } else if (automation.effect === 'death' && seatNumber) {
+        setSeats((current) => current.map((seat) => seat.number === seatNumber ? { ...seat,alive:false } : seat));
+      } else if (automation.effect === 'revive' && seatNumber) {
+        setSeats((current) => current.map((seat) => seat.number === seatNumber ? { ...seat,alive:true } : seat));
+      }
+      if (seatNumber && automation.effect !== 'record') addLog('status',`${seatNumber}号${automationEffectLabels[automation.effect]}`,`${actorRole.name}自动结算`,phase,gameStarted ? dayNumber : 1);
+    }
+
     if (actorRole?.id === 'poisoner' && !actorImpaired) {
       setSeats((current) => current.map((seat) => {
         const statuses = new Set(seat.statuses);
@@ -726,6 +754,16 @@ export default function BoardBuilder() {
       setSeats((current) => current.map((seat) => seat.number === automaticPoisonSeat ? { ...seat, statuses:seat.statuses.filter((status) => status !== 'poisoned') } : seat));
       setAutomaticPoisonSeat(null);
     }
+    if (gamePhase === 'day') {
+      const expiring = automaticStatusEffects.filter((effect) => effect.expires === 'nextDusk');
+      if (expiring.length) {
+        setSeats((current) => current.map((seat) => {
+          const statusesToRemove = new Set(expiring.filter((effect) => effect.seatNumber === seat.number).map((effect) => effect.status));
+          return statusesToRemove.size ? { ...seat,statuses:seat.statuses.filter((status) => !statusesToRemove.has(status)) } : seat;
+        }));
+        setAutomaticStatusEffects((current) => current.filter((effect) => effect.expires !== 'nextDusk'));
+      }
+    }
     addLog('system',`进入${phaseName(nextPhase,nextDay)}`,undefined,nextPhase,nextDay);
   }
   function clearHistory() {
@@ -737,6 +775,7 @@ export default function BoardBuilder() {
     setCompletedSteps(new Set());
     setAbilityTargets({});
     setAutomaticPoisonSeat(null);
+    setAutomaticStatusEffects([]);
     setGameStarted(false);
     setGamePhase('firstNight');
     setDayNumber(1);
