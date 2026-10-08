@@ -91,7 +91,7 @@ const shuffled = <T,>(items: T[]) => {
 
 function RoleIcon({ role, className = '' }: { role: Role; className?: string }) {
   if (role.glyph) return <span className={`role-icon role-glyph ${className}`} aria-hidden="true">{role.glyph}</span>;
-  return <img className={`role-icon ${className}`} src={publicAsset(`/roles/${role.id}.webp`)} alt="" aria-hidden="true"/>;
+  return <img className={`role-icon ${className}`} src={role.image ?? publicAsset(`/roles/${role.id}.webp`)} alt="" aria-hidden="true"/>;
 }
 
 function RoleCard({ role, selected, locked, copies, setupChoice, onSelect, onLock, onCopiesChange, onSetupChoiceChange }: { role: Role; selected: boolean; locked: boolean; copies:number; setupChoice?:number; onSelect: () => void; onLock: () => void; onCopiesChange:(count:number) => void; onSetupChoiceChange:(value:number) => void }) {

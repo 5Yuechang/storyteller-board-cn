@@ -5,11 +5,25 @@ import { Download, FileJson, ImagePlus, Save, Trash2, Upload, X } from 'lucide-r
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
-import { alignmentMeta, standardCounts, type Alignment, type NightStep, type Role, type ScriptDefinition } from '@/app/data/scripts';
+import { alignmentMeta, scripts as builtInScripts, standardCounts, type Alignment, type NightStep, type Role, type ScriptDefinition } from '@/app/data/scripts';
 
 const alignments: Alignment[] = ['townsfolk','outsider','minion','demon'];
 const timingOptions: Role['timing'][] = ['首夜','每夜','每夜*','白天','被动','一次'];
 const emptyText = ():Record<Alignment,string> => ({ townsfolk:'',outsider:'',minion:'',demon:'' });
+type BotcMeta = { id:'_meta'; name?:string; author?:string; firstNight?:string[]; otherNight?:string[]; bootlegger?:string[] };
+type BotcRole = { id?:string; name?:string; team?:string; ability?:string; image?:string; firstNight?:number; otherNight?:number; firstNightReminder?:string; otherNightReminder?:string; setup?:boolean };
+
+const standardRoleFallbacks:Record<string,Role> = {
+  slayer:{ id:'slayer',name:'猎手',alignment:'townsfolk',timing:'一次',glyph:'猎',ability:'每局游戏限一次，在白天时，你可以公开选择一名玩家：如果他是恶魔，他死亡。' },
+  mayor:{ id:'mayor',name:'镇长',alignment:'townsfolk',timing:'被动',glyph:'镇',ability:'如果只剩三名玩家存活且白天无人被处决，你的阵营获胜。如果你在夜晚死亡，可能会有另一名玩家代替你死亡。' },
+  hatter:{ id:'hatter',name:'帽匠',alignment:'outsider',timing:'被动',glyph:'帽',ability:'如果你死亡，爪牙和恶魔可以选择变成新的爪牙与恶魔角色。' },
+  plaguedoctor:{ id:'plaguedoctor',name:'瘟疫医生',alignment:'outsider',timing:'被动',glyph:'疫',ability:'如果你死亡，说书人会获得一个不在场爪牙的能力。' },
+  baron:{ id:'baron',name:'男爵',alignment:'minion',timing:'被动',glyph:'爵',ability:'会有额外的外来者在场。',setup:'+2 外来者',setupRules:{outsiderDelta:{options:[2],default:2}} },
+  scarletwoman:{ id:'scarletwoman',name:'红唇女郎',alignment:'minion',timing:'被动',glyph:'红',ability:'如果有五名或更多玩家存活且恶魔死亡，你会变成该恶魔。' },
+};
+const builtInRoleCatalog = new Map<string,Role>();
+for (const script of builtInScripts) for (const role of script.roles) if (!builtInRoleCatalog.has(role.id)) builtInRoleCatalog.set(role.id,role);
+for (const role of Object.values(standardRoleFallbacks)) builtInRoleCatalog.set(role.id,role);
 
 function safeId(value:string) {
   const latin = value.trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
@@ -31,6 +45,56 @@ function buildNightOrder(roles:Role[]):ScriptDefinition['nightOrder'] {
     first:roles.filter((role) => ['首夜','每夜','每夜*'].includes(role.timing ?? '')).map((role) => toStep(role,'first')),
     other:roles.filter((role) => ['每夜','每夜*'].includes(role.timing ?? '')).map((role) => toStep(role,'other')),
   };
+}
+
+function botcTiming(role:BotcRole):Role['timing'] {
+  if ((role.firstNight ?? 0) > 0 && (role.otherNight ?? 0) > 0) return '每夜';
+  if ((role.firstNight ?? 0) > 0) return '首夜';
+  if ((role.otherNight ?? 0) > 0) return '每夜*';
+  if (/每局游戏限一次/.test(role.ability ?? '')) return '一次';
+  if (/白天|公开|提名/.test(role.ability ?? '')) return '白天';
+  return '被动';
+}
+
+function convertBotcScript(value:unknown):ScriptDefinition|null {
+  if (!Array.isArray(value)) return null;
+  const meta = value.find((item):item is BotcMeta => Boolean(item && typeof item === 'object' && (item as BotcMeta).id === '_meta'));
+  if (!meta) return null;
+  const objectRoles = new Map<string,BotcRole>();
+  value.forEach((item) => { if (item && typeof item === 'object' && (item as BotcRole).id && (item as BotcRole).id !== '_meta') objectRoles.set((item as BotcRole).id!,item as BotcRole); });
+  const roles:Role[] = [];
+  const seen = new Set<string>();
+  for (const item of value.slice(1)) {
+    const source = typeof item === 'string' ? objectRoles.get(item) : item && typeof item === 'object' ? item as BotcRole : undefined;
+    const id = typeof item === 'string' ? item : source?.id;
+    if (!id || seen.has(id) || id === 'bootlegger') continue;
+    const existing = builtInRoleCatalog.get(id);
+    const team = source?.team ?? existing?.alignment;
+    if (!alignments.includes(team as Alignment)) continue;
+    const role:Role = source ? {
+      id,name:source.name?.trim() || existing?.name || id,alignment:team as Alignment,
+      ability:source.ability?.trim() || existing?.ability || '能力说明待补充。',timing:botcTiming(source),
+      image:source.image || existing?.image,glyph:source.image ? undefined : existing?.glyph,
+      setup:source.setup ? '该角色会改变初始配置' : existing?.setup,setupRules:existing?.setupRules,
+    } : existing ? { ...existing } : { id,name:id,alignment:'townsfolk',ability:'未能在本机角色库中找到能力说明。',timing:'被动',glyph:'?' };
+    roles.push(role); seen.add(id);
+  }
+  const roleMap = new Map(roles.map((role) => [role.id,role]));
+  const makeOrder = (ids:string[]|undefined,mode:'first'|'other'):NightStep[] => (ids ?? []).flatMap<NightStep>((id,index):NightStep[] => {
+    if (id === 'dusk' || id === 'dawn') return [];
+    if (id === 'minioninfo') return [{ id:`minion-info-${mode}`,name:'爪牙信息',note:'唤醒爪牙，让其互认并确认恶魔。',phase:'信息' as const,requiredAlignment:'minion' as const }];
+    if (id === 'demoninfo') return [{ id:`demon-info-${mode}`,name:'恶魔信息',note:'确认爪牙与三项不在场的善良角色。',phase:'信息' as const,requiredAlignment:'demon' as const }];
+    const role = roleMap.get(id); if (!role) return [];
+    const raw = objectRoles.get(id);
+    const note = (mode === 'first' ? raw?.firstNightReminder : raw?.otherNightReminder) || role.ability;
+    return [{ id:`${id}-${mode}-${index}`,name:role.name,note,roleId:id,phase:(role.alignment === 'minion' || role.alignment === 'demon') ? '行动' as const : '信息' as const }];
+  });
+  const specialRules = [
+    ...(meta.bootlegger ?? []).map((description,index) => ({ name:`私规 ${index + 1}`,description })),
+    ...value.filter((item):item is BotcRole => Boolean(item && typeof item === 'object' && (item as BotcRole).team === 'fabled')).map((item) => ({ name:item.name || '传奇角色',description:item.ability || '此剧本包含传奇角色。' })),
+  ];
+  const name = meta.name?.trim() || '导入剧本';
+  return { id:`custom-${safeId(name)}-${Date.now().toString(36)}`,name,author:meta.author?.trim() || '自定义',description:'由标准《血染钟楼》剧本 JSON 导入。',playerRange:[7,15],counts:{ ...standardCounts },roles,specialRules:specialRules.length ? specialRules : undefined,nightOrder:{ first:makeOrder(meta.firstNight,'first'),other:makeOrder(meta.otherNight,'other') },custom:true };
 }
 
 async function compressImage(file:File):Promise<string> {
@@ -77,11 +141,14 @@ export function ScriptLibraryDialog({ open, customScripts, currentScript, onClos
   async function chooseJson(file?:File) {
     if (!file) return;
     try {
-      const value = JSON.parse(await file.text()) as ScriptDefinition;
-      if (!value.name || !Array.isArray(value.roles) || !value.counts) throw new Error('invalid');
-      const script = { ...value,id:`custom-${safeId(value.name)}-${Date.now().toString(36)}`,custom:true,sourceImage:undefined };
+      const value = JSON.parse(await file.text()) as unknown;
+      const converted = convertBotcScript(value);
+      const native = !Array.isArray(value) && value && typeof value === 'object' ? value as ScriptDefinition : null;
+      if (!converted && (!native?.name || !Array.isArray(native.roles) || !native.counts)) throw new Error('invalid');
+      const base = converted ?? native!;
+      const script = { ...base,id:`custom-${safeId(base.name)}-${Date.now().toString(36)}`,custom:true,sourceImage:undefined };
       onSave(script); setError(''); onClose();
-    } catch { setError('这个 JSON 不是有效的剧本文件。'); }
+    } catch { setError('无法识别这个 JSON。支持标准《血染钟楼》剧本 JSON，以及本工具导出的 JSON。'); }
   }
 
   function saveDraft() {
@@ -111,7 +178,7 @@ export function ScriptLibraryDialog({ open, customScripts, currentScript, onClos
               {sourceImage ? <img src={sourceImage} alt="已选择的剧本参考图"/> : <><ImagePlus/><strong>选择剧本图片</strong><small>图片仅在本机压缩保存，供录入时对照</small></>}
             </button>
             <input ref={fileRef} hidden type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => void chooseImage(event.target.files?.[0])}/>
-            <div className="script-json-import"><FileJson/><span><strong>已有结构化文件？</strong><small>导入本工具导出的 JSON，可跳过手动录入。</small></span><Button variant="outline" onClick={() => jsonRef.current?.click()}><Upload/>导入 JSON</Button><input ref={jsonRef} hidden type="file" accept="application/json,.json" onChange={(event) => void chooseJson(event.target.files?.[0])}/></div>
+            <div className="script-json-import"><FileJson/><span><strong>已有结构化文件？</strong><small>支持标准《血染钟楼》剧本 JSON 和本工具导出的 JSON。</small></span><Button variant="outline" onClick={() => jsonRef.current?.click()}><Upload/>导入 JSON</Button><input ref={jsonRef} hidden type="file" accept="application/json,.json" onChange={(event) => void chooseJson(event.target.files?.[0])}/></div>
           </section>
           <section className="script-basic-fields">
             <label><span>剧本名称</span><Input value={name} onChange={(event) => setName(event.target.value)} placeholder="例如：暗流涌动"/></label>
