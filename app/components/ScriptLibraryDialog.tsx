@@ -1,13 +1,14 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Download, FileJson, ImagePlus, Save, SlidersHorizontal, Trash2, Upload, X } from 'lucide-react';
+import { AlertTriangle, Archive, CheckCircle2, Download, FileJson, ImagePlus, Save, SlidersHorizontal, Trash2, Upload, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { alignmentMeta, scripts as builtInScripts, standardCounts, type Alignment, type AutomationEffect, type NightStep, type Role, type RoleAutomation, type ScriptDefinition } from '@/app/data/scripts';
 
 const alignments: Alignment[] = ['townsfolk','outsider','minion','demon'];
+export const backupFileType = 'storyteller-board-backup';
 const timingOptions: Role['timing'][] = ['首夜','每夜','每夜*','白天','被动','一次'];
 const effectOptions:{ value:AutomationEffect; label:string }[] = [
   { value:'record',label:'只记录，不自动结算' }, { value:'poisoned',label:'标记中毒' }, { value:'drunk',label:'标记醉酒' },
@@ -158,7 +159,7 @@ function RoleLogicEditor({ script, onChange }:{ script:ScriptDefinition; onChang
   </section>;
 }
 
-export function ScriptLibraryDialog({ open, customScripts, currentScript, onClose, onSave, onUpdate, onDelete }:{ open:boolean; customScripts:ScriptDefinition[]; currentScript:ScriptDefinition; onClose:()=>void; onSave:(script:ScriptDefinition)=>void; onUpdate:(script:ScriptDefinition)=>void; onDelete:(id:string)=>void }) {
+export function ScriptLibraryDialog({ open, customScripts, currentScript, onClose, onSave, onUpdate, onDelete, onExportBackup, onImportBackup }:{ open:boolean; customScripts:ScriptDefinition[]; currentScript:ScriptDefinition; onClose:()=>void; onSave:(script:ScriptDefinition)=>void; onUpdate:(script:ScriptDefinition)=>void; onDelete:(id:string)=>void; onExportBackup:()=>void; onImportBackup:(value:{ customScripts?:unknown; currentGame?:unknown })=>void }) {
   const [name,setName] = useState('');
   const [minPlayers,setMinPlayers] = useState(7);
   const [maxPlayers,setMaxPlayers] = useState(15);
@@ -171,6 +172,12 @@ export function ScriptLibraryDialog({ open, customScripts, currentScript, onClos
   const jsonRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { if (!open) return; setError(''); },[open]);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event:KeyboardEvent) => { if (event.key === 'Escape') { setLogicDraft(null); onClose(); } };
+    window.addEventListener('keydown',onKey);
+    return () => window.removeEventListener('keydown',onKey);
+  },[open,onClose]);
   const parsedRoles = useMemo(() => {
     const id = safeId(name);
     return alignments.flatMap((alignment) => parseRoleLines(roleText[alignment],alignment,id));
@@ -188,6 +195,9 @@ export function ScriptLibraryDialog({ open, customScripts, currentScript, onClos
     if (!file) return;
     try {
       const value = JSON.parse(await file.text()) as unknown;
+      if (value && typeof value === 'object' && !Array.isArray(value) && (value as { type?:string }).type === backupFileType) {
+        setError(''); onClose(); onImportBackup(value as { customScripts?:unknown; currentGame?:unknown }); return;
+      }
       const converted = convertBotcScript(value);
       const native = !Array.isArray(value) && value && typeof value === 'object' ? value as ScriptDefinition : null;
       if (!converted && (!native?.name || !Array.isArray(native.roles) || !native.counts)) throw new Error('invalid');
@@ -224,6 +234,8 @@ export function ScriptLibraryDialog({ open, customScripts, currentScript, onClos
           {!customScripts.length && <p>还没有自定义剧本。</p>}
           {customScripts.map((script) => { const pending = script.roles.filter((role) => role.automation && !role.automation.configured).length; return <article key={script.id}><span><b>{script.name}</b><small>{script.roles.length} 个角色{pending ? ` · ${pending} 个待配置` : ''}</small></span><div><button onClick={() => setLogicDraft(withUnknownRoleAutomation(script))} aria-label={`配置${script.name}角色逻辑`}><SlidersHorizontal/></button><button onClick={() => downloadScript(script)} aria-label={`导出${script.name}`}><Download/></button><button className="danger" onClick={() => onDelete(script.id)} aria-label={`删除${script.name}`}><Trash2/></button></div></article>; })}
           <Button variant="outline" onClick={() => downloadScript(currentScript)}><FileJson/>导出当前剧本 JSON</Button>
+          <Button variant="outline" onClick={onExportBackup}><Archive/>备份全部数据</Button>
+          <small className="backup-hint">备份包含全部自定义剧本和当前对局；用右侧“导入 JSON”即可恢复。</small>
         </aside>
         <div className="script-import-form">
           {logicDraft ? <RoleLogicEditor script={logicDraft} onChange={setLogicDraft}/> : <>
@@ -232,7 +244,7 @@ export function ScriptLibraryDialog({ open, customScripts, currentScript, onClos
               {sourceImage ? <img src={sourceImage} alt="已选择的剧本参考图"/> : <><ImagePlus/><strong>选择剧本图片</strong><small>图片仅在本机压缩保存，供录入时对照</small></>}
             </button>
             <input ref={fileRef} hidden type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => void chooseImage(event.target.files?.[0])}/>
-            <div className="script-json-import"><FileJson/><span><strong>已有结构化文件？</strong><small>支持标准《血染钟楼》剧本 JSON 和本工具导出的 JSON。</small></span><Button variant="outline" onClick={() => jsonRef.current?.click()}><Upload/>导入 JSON</Button><input ref={jsonRef} hidden type="file" accept="application/json,.json" onChange={(event) => void chooseJson(event.target.files?.[0])}/></div>
+            <div className="script-json-import"><FileJson/><span><strong>已有结构化文件？</strong><small>支持标准《血染钟楼》剧本 JSON、本工具导出的 JSON 和完整备份。</small></span><Button variant="outline" onClick={() => jsonRef.current?.click()}><Upload/>导入 JSON</Button><input ref={jsonRef} hidden type="file" accept="application/json,.json" onChange={(event) => void chooseJson(event.target.files?.[0])}/></div>
           </section>
           <section className="script-basic-fields">
             <label><span>剧本名称</span><Input value={name} onChange={(event) => setName(event.target.value)} placeholder="例如：暗流涌动"/></label>
