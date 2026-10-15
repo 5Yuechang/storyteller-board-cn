@@ -676,19 +676,36 @@ export default function BoardBuilder() {
     const next = new Set(locked);
     const nextCopies:Record<string,number> = Object.fromEntries([...locked].map((id) => [id,Math.max(1,roleCopies[id] ?? 1)]));
     const alignmentCount = (alignment:Alignment) => script.roles.filter((role) => role.alignment === alignment && next.has(role.id)).reduce((total,role) => total + Math.max(1,nextCopies[role.id] ?? 1),0);
-    const addToAlignment = (alignment: Alignment, target: number) => {
-      const candidates = script.roles.filter((role) => role.alignment === alignment && !next.has(role.id));
+    const changesSetup = (role:Role) => Boolean(role.setupRules?.outsiderDelta || role.setupRules?.requiresNoEvil);
+    // “无邪恶角色”会把整局变成特殊玩法，只有锁定时才会出现在配板里。
+    const addToAlignment = (alignment: Alignment, target: number, allowSetupRoles = true) => {
+      const candidates = script.roles.filter((role) => role.alignment === alignment && !next.has(role.id) && !role.setupRules?.requiresNoEvil && (allowSetupRoles || !changesSetup(role)));
       const pool = random ? shuffled(candidates) : candidates;
       pool.slice(0, Math.max(0, target - alignmentCount(alignment))).forEach((role) => { next.add(role.id); nextCopies[role.id] = 1; });
     };
 
     alignments.forEach((alignment) => addToAlignment(alignment,baseQuota[alignment]));
-    const targetQuota = withSetupAdjustments(baseQuota,script.roles,next,setupChoices);
-    alignments.forEach((alignment) => {
-      const removable = (random ? shuffled(script.roles) : [...script.roles]).filter((role) => role.alignment === alignment && next.has(role.id) && !locked.has(role.id) && !role.setupRules?.outsiderDelta);
-      while (alignmentCount(alignment) > targetQuota[alignment] && removable.length) { const role = removable.pop()!; next.delete(role.id); delete nextCopies[role.id]; }
-      addToAlignment(alignment,targetQuota[alignment]);
-    });
+    // 补齐阶段只增删不改配置的角色，避免补进来的角色又改变刚算好的名额。
+    let targetQuota = withSetupAdjustments(baseQuota,script.roles,next,setupChoices);
+    for (let pass = 0; pass < 4; pass += 1) {
+      let setupChanged = false;
+      alignments.forEach((alignment) => {
+        // 先移除普通角色；仍然超额时才移除会改配置的角色，并在本轮结束后重算名额。
+        const unlocked = (random ? shuffled(script.roles) : [...script.roles]).filter((role) => role.alignment === alignment && next.has(role.id) && !locked.has(role.id));
+        const removable = [...unlocked.filter(changesSetup),...unlocked.filter((role) => !changesSetup(role))];
+        while (alignmentCount(alignment) > targetQuota[alignment] && removable.length) {
+          const role = removable.pop()!;
+          next.delete(role.id); delete nextCopies[role.id];
+          if (changesSetup(role)) setupChanged = true;
+        }
+        addToAlignment(alignment,targetQuota[alignment],false);
+      });
+      // 普通角色不够时才补入改配置的角色，并按新名额再调整一轮。
+      const short = alignments.filter((alignment) => alignmentCount(alignment) < targetQuota[alignment]);
+      if (!short.length && !setupChanged) break;
+      short.forEach((alignment) => addToAlignment(alignment,targetQuota[alignment]));
+      targetQuota = withSetupAdjustments(baseQuota,script.roles,next,setupChoices);
+    }
     const bluffPool = script.roles.filter((role) => (role.alignment === 'townsfolk' || (targetQuota.outsider > 0 && role.alignment === 'outsider')) && !next.has(role.id));
     setDrunkFakeRoleId(null); setSelected(next); setRoleCopies(nextCopies); setDemonBluffs(shuffled(bluffPool).slice(0,3).map((role) => role.id)); setSeats((current) => makeSeats(playerCount,current)); setCompletedSteps(new Set()); setAbilityTargets({}); setSnakeSwap(null); setAutomaticStatusEffects([]);
   }
