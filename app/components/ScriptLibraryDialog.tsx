@@ -123,7 +123,7 @@ async function compressImage(file:File):Promise<string> {
 function downloadScript(script:ScriptDefinition) {
   const blob = new Blob([JSON.stringify({ ...script,sourceImage:undefined },null,2)],{ type:'application/json' });
   const url = URL.createObjectURL(blob); const link = document.createElement('a');
-  link.href = url; link.download = `${script.name}.json`; link.click(); URL.revokeObjectURL(url);
+  link.href = url; link.download = `${script.name}.json`; link.click(); window.setTimeout(() => URL.revokeObjectURL(url),1000);
 }
 
 function withUnknownRoleAutomation(script:ScriptDefinition):ScriptDefinition {
@@ -150,7 +150,7 @@ function RoleLogicEditor({ script, onChange }:{ script:ScriptDefinition; onChang
           {automation.configured && <>
             <div className="role-logic-field"><span>选择玩家</span><NativeSelect value={automation.targetCount} onChange={(event) => update(role.id,{ ...automation,targetCount:Number(event.target.value) })} aria-label={`${role.name}选择玩家数量`}>{[0,1,2,3].map((count) => <NativeSelectOption key={count} value={count}>{count ? `${count} 名` : '无需选择'}</NativeSelectOption>)}</NativeSelect></div>
             <div className="role-logic-field"><span>自动效果</span><NativeSelect value={automation.effect} onChange={(event) => update(role.id,{ ...automation,effect:event.target.value as AutomationEffect })} aria-label={`${role.name}自动效果`}>{effectOptions.map((option) => <NativeSelectOption key={option.value} value={option.value}>{option.label}</NativeSelectOption>)}</NativeSelect></div>
-            {statusEffect && <div className="role-logic-field"><span>持续时间</span><NativeSelect value={automation.expires ?? 'manual'} onChange={(event) => update(role.id,{ ...automation,expires:event.target.value as RoleAutomation['expires'] })} aria-label={`${role.name}效果持续时间`}><NativeSelectOption value="manual">直到手动移除</NativeSelectOption><NativeSelectOption value="nextDusk">下个黄昏自动移除</NativeSelectOption></NativeSelect></div>}
+            {statusEffect && <div className="role-logic-field"><span>持续时间</span><NativeSelect value={automation.expires ?? 'manual'} onChange={(event) => update(role.id,{ ...automation,expires:event.target.value as RoleAutomation['expires'] })} aria-label={`${role.name}效果持续时间`}><NativeSelectOption value="manual">直到手动移除</NativeSelectOption><NativeSelectOption value="nextDawn">天亮时自动移除</NativeSelectOption><NativeSelectOption value="nextDusk">下个黄昏自动移除</NativeSelectOption></NativeSelect></div>}
           </>}
         </div>
       </article>;
@@ -158,7 +158,7 @@ function RoleLogicEditor({ script, onChange }:{ script:ScriptDefinition; onChang
   </section>;
 }
 
-export function ScriptLibraryDialog({ open, customScripts, currentScript, onClose, onSave, onDelete }:{ open:boolean; customScripts:ScriptDefinition[]; currentScript:ScriptDefinition; onClose:()=>void; onSave:(script:ScriptDefinition)=>void; onDelete:(id:string)=>void }) {
+export function ScriptLibraryDialog({ open, customScripts, currentScript, onClose, onSave, onUpdate, onDelete }:{ open:boolean; customScripts:ScriptDefinition[]; currentScript:ScriptDefinition; onClose:()=>void; onSave:(script:ScriptDefinition)=>void; onUpdate:(script:ScriptDefinition)=>void; onDelete:(id:string)=>void }) {
   const [name,setName] = useState('');
   const [minPlayers,setMinPlayers] = useState(7);
   const [maxPlayers,setMaxPlayers] = useState(15);
@@ -212,7 +212,7 @@ export function ScriptLibraryDialog({ open, customScripts, currentScript, onClos
 
   function saveLogic() {
     if (!logicDraft) return;
-    onSave(logicDraft); setLogicDraft(null); onClose();
+    onUpdate(logicDraft); setLogicDraft(null); onClose();
   }
 
   return <div className="script-dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>

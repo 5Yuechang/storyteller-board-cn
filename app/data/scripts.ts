@@ -1,10 +1,10 @@
 export type Alignment = 'townsfolk' | 'outsider' | 'minion' | 'demon';
 export type SetupRules = { outsiderDelta?: { options:number[]; default:number }; requiresNoEvil?:boolean };
 export type AutomationEffect = 'record'|'poisoned'|'drunk'|'protected'|'noAbility'|'death'|'revive'|'turnedGood'|'turnedEvil';
-export type RoleAutomation = { configured:boolean; targetCount:number; effect:AutomationEffect; expires?:'manual'|'nextDusk' };
+export type RoleAutomation = { configured:boolean; targetCount:number; effect:AutomationEffect; expires?:'manual'|'nextDawn'|'nextDusk' };
 export type Role = { id: string; name: string; alignment: Alignment; ability: string; glyph?: string; image?:string; timing?: '首夜' | '每夜' | '每夜*' | '白天' | '被动' | '一次'; setup?: string; setupRules?:SetupRules; automation?:RoleAutomation; maxCopies?:number; note?: string; misinformation?: string[] };
 export type PlayerCount = Record<Alignment, number>;
-export type NightStep = { id: string; name: string; note: string; roleId?: string; phase?: '信息'|'行动'|'结算'; deadMode?: 'show'|'only'; requiredAlignment?: Alignment; skipWhenRolePresent?: string };
+export type NightStep = { id: string; name: string; note: string; roleId?: string; phase?: '信息'|'行动'|'结算'; deadMode?: 'show'|'only'; requiredAlignment?: Alignment; skipWhenRolePresent?: string; drunkActor?: boolean };
 export type ScriptDefinition = { id: string; name: string; author: string; playerRange: [number, number]; description: string; counts: Record<number, PlayerCount>; roles: Role[]; specialRules?: { name:string; description:string }[]; nightOrder: { first: NightStep[]; other: NightStep[] }; custom?:boolean; sourceImage?:string };
 
 export const standardCounts: Record<number, PlayerCount> = {
@@ -385,6 +385,76 @@ export const scripts: ScriptDefinition[] = [{
       {id:'oa-oracle-other',name:'神谕者',note:'告知死亡玩家中邪恶玩家的数量。',roleId:'oracle',phase:'信息'},
       {id:'oa-flowergirl-other',name:'卖花女孩',note:'告知今天白天恶魔是否投过票。',roleId:'flowergirl',phase:'信息'},
       {id:'oa-seamstress-other',name:'女裁缝',note:'若尚未发动，可选择两名其他玩家并得知是否同阵营。',roleId:'seamstress',phase:'信息'},
+    ]
+  }
+}, {
+  id:'last-call-tavern', name:'欢乐时光', author:'共创草案', playerRange:[7,14],
+  description:'7–14 人欢乐酒馆剧本：用举杯记录、醉酒状态、抽牌与说书人任务构成可以追踪的真假信息链。',
+  counts:{
+    7:{townsfolk:4,outsider:1,minion:1,demon:1},
+    8:{townsfolk:5,outsider:1,minion:1,demon:1},
+    9:{townsfolk:5,outsider:2,minion:1,demon:1},
+    10:{townsfolk:6,outsider:1,minion:2,demon:1},
+    11:{townsfolk:7,outsider:1,minion:2,demon:1},
+    12:{townsfolk:7,outsider:2,minion:2,demon:1},
+    13:{townsfolk:8,outsider:1,minion:3,demon:1},
+    14:{townsfolk:9,outsider:1,minion:3,demon:1},
+  },
+  specialRules:[
+    {name:'举杯记录',description:'每名玩家每个白天最多登记一次“举杯”；水、软饮、空杯或抿一口均可，现实饮酒量不影响任何能力。进入下一天时清除全部“今日已举杯”标记。'},
+    {name:'陌生酒局',description:'恶魔和爪牙在首夜互不认识。恶魔仍会得知三项不在场的善良角色；角色转变或能力明确要求时，说书人再单独告知相关玩家。'},
+    {name:'欢乐优先',description:'猜拳、碰杯和说书人任务均可拒绝现实饮酒或肢体接触，并使用举杯、喝水或口头确认代替。'},
+  ],
+  roles:[
+    {id:'cup-auditor',name:'查杯官',glyph:'🧾',alignment:'townsfolk',timing:'每夜*',ability:'每个夜晚*，你会得知今天没有登记“举杯”的存活玩家中，有多少名是善良玩家。',misinformation:['把数字上下偏移一，让饮酒分组仍保留可推理空间。','给出真实数字的互补值，引导玩家怀疑另一组。']},
+    {id:'hangover-investigator',name:'宿醉调查员',glyph:'🔎',alignment:'townsfolk',timing:'每夜*',ability:'每个夜晚*，你会得知今天登记过“举杯”的存活玩家中，是否至少有一名邪恶玩家。',misinformation:['在邪恶玩家举杯时给出“否”。','在只有善良玩家举杯时给出“是”。']},
+    {id:'cup-counter',name:'数杯师',glyph:'🧮',alignment:'townsfolk',timing:'每夜*',ability:'每个夜晚*，你会得知当前有多少名存活玩家醉酒。',misinformation:['少报一名醉酒玩家，掩护邪恶方造成的醉酒。','多报一名玩家，让清醒的信息位怀疑自己。']},
+    {id:'hostess',name:'小姐',glyph:'🥂',alignment:'townsfolk',timing:'白天',ability:'每个白天，第一个与你完成“举杯”的其他玩家当晚免受恶魔的负面能力。你不能连续两天保护同一名玩家。',automation:{configured:true,targetCount:1,effect:'protected',expires:'nextDawn'},note:'“举杯”不要求饮用酒精；由说书人在入夜后记录受保护玩家。'},
+    {id:'comedian',name:'逗哏',glyph:'🎭',alignment:'townsfolk',timing:'白天',ability:'每个白天，你秘密抽取一项无害的说书人任务。若你在提名开始前完成且没有直接说出任务，当晚你会得知三名玩家，其中至少两名善良；否则你醉酒直到下个黄昏。',automation:{configured:true,targetCount:3,effect:'record',expires:'manual'},note:'任务不得要求饮酒、肢体接触、泄露魔典或干扰裁定。'},
+    {id:'professor',name:'教授',alignment:'townsfolk',timing:'一次',ability:'每局游戏限一次，在夜晚时*，你可以选择一名死亡的玩家：如果他是镇民，他会被复活。'},
+    {id:'gambler',name:'赌徒',alignment:'townsfolk',timing:'每夜*',ability:'每个夜晚*，你要选择一名玩家并猜测他的角色：如果你猜错了，你会死亡。'},
+    {id:'empath',name:'共情者',glyph:'💙',alignment:'townsfolk',timing:'每夜',ability:'每个夜晚，你会得知与你邻近的两名存活玩家中邪恶玩家的数量。',misinformation:['把数字上下偏移一。','在邻座变化后沿用前一晚的数字，制造座位判断偏差。']},
+    {id:'chef',name:'厨师',alignment:'townsfolk',timing:'首夜',ability:'在你的首个夜晚，你会得知场上邻座的邪恶玩家有多少对。'},
+    {id:'sailor',name:'水手',glyph:'⚓',alignment:'townsfolk',timing:'每夜',ability:'每个夜晚，你要选择一名存活的玩家：你或他会醉酒直到下个黄昏。你不会死亡。'},
+    {id:'undertaker',name:'送葬者',glyph:'⚰',alignment:'townsfolk',timing:'每夜*',ability:'每个夜晚*，你会得知今天死于处决的玩家的角色。'},
+
+    {id:'drunk',name:'酒鬼',alignment:'outsider',timing:'被动',ability:'你不知道你是酒鬼。你以为你是一个镇民角色，但其实你不是。'},
+    {id:'brewer',name:'酿酒者',glyph:'🍺',alignment:'outsider',timing:'白天',ability:'每个白天，你可以登记“举杯”。若你这样做，当晚随机一名其他存活玩家醉酒，直到下个黄昏。',automation:{configured:true,targetCount:1,effect:'drunk',expires:'nextDusk'},note:'随机结果由说书人或工具产生；酿酒者不知道目标。'},
+    {id:'drinking-madman',name:'酒疯子',glyph:'✊',alignment:'outsider',timing:'白天',ability:'每个白天限一次，你可以公开与一名玩家猜拳：输家醉酒直到下个黎明。如果你输了，你可以登记“举杯”，改为令赢家醉酒。',note:'拒绝猜拳的玩家不受惩罚；说书人可要求酒疯子另选玩家。'},
+    {id:'sweetheart',name:'心上人',glyph:'🎀',alignment:'outsider',timing:'被动',ability:'当你死亡时，会有一名玩家开始醉酒。'},
+
+    {id:'dealer',name:'发牌人',glyph:'🃏',alignment:'minion',timing:'每夜',ability:'每个夜晚，你从全部存活座位号和一张“酒令牌”中随机抽两张并选择一张：座位对应玩家醉酒直到下个黄昏。若选择酒令牌，明天第一个正面回答你公开问题的玩家永久醉酒；酒令牌每局最多生效一次。',automation:{configured:true,targetCount:1,effect:'drunk',expires:'nextDusk'},note:'抽到酒令牌时，目标在白天确定并由说书人手动添加醉酒标记。'},
+    {id:'poisoner',name:'投毒者',alignment:'minion',timing:'每夜',ability:'每个夜晚，你要选择一名玩家：他在当晚和明天白天中毒。'},
+    {id:'scarlet-woman',name:'红唇女郎',glyph:'💋',alignment:'minion',timing:'被动',ability:'如果大于等于五名玩家存活时恶魔死亡，你变成那个恶魔。'},
+
+    {id:'wine-god',name:'酒神',glyph:'🍷',alignment:'demon',timing:'每夜*',ability:'每个夜晚*，选择两名不同的玩家：第一名醉酒直到下个黄昏，第二名死亡。如果今天所有存活玩家都登记过“举杯”，你可以令第一名也死亡。',note:'夜序中的目标1为醉酒目标，目标2为通常死亡目标；额外死亡由说书人确认。'},
+    {id:'imp',name:'小恶魔',alignment:'demon',timing:'每夜*',ability:'每个夜晚*，你要选择一名玩家：他死亡。如果你以这种方式自杀，一名爪牙会变成小恶魔。'},
+  ],
+  nightOrder:{
+    first:[
+      {id:'lc-demon-info',name:'恶魔伪装',note:'只向恶魔展示三项不在场的善良角色；不要告知爪牙身份。',phase:'信息',requiredAlignment:'demon'},
+      {id:'lc-dealer-first',name:'发牌人',note:'抽取两张座位／酒令牌并选择一张；若为座位牌，使对应玩家醉酒至下个黄昏。',roleId:'dealer',phase:'行动'},
+      {id:'lc-poisoner-first',name:'投毒者',note:'选择一名玩家，使其中毒至明天黄昏。',roleId:'poisoner',phase:'行动'},
+      {id:'lc-sailor-first',name:'水手',note:'选择一名存活玩家；决定水手或目标之一醉酒至下个黄昏。',roleId:'sailor',phase:'行动'},
+      {id:'lc-chef-first',name:'厨师',note:'告知场上邻座邪恶玩家的对数。',roleId:'chef',phase:'信息'},
+      {id:'lc-empath-first',name:'共情者',note:'告知两名存活邻座中邪恶玩家的数量。',roleId:'empath',phase:'信息'},
+    ],
+    other:[
+      {id:'lc-dealer-other',name:'发牌人',note:'抽取两张座位／酒令牌并选择一张；处理醉酒或次日酒令。',roleId:'dealer',phase:'行动'},
+      {id:'lc-poisoner-other',name:'投毒者',note:'选择一名玩家，使其中毒至明天黄昏。',roleId:'poisoner',phase:'行动'},
+      {id:'lc-hostess-other',name:'小姐',note:'记录今天第一个与小姐举杯的玩家，使其当晚免受恶魔负面能力；不可连续两天选择同一人。',roleId:'hostess',phase:'行动'},
+      {id:'lc-brewer-other',name:'酿酒者',note:'若今天发动，随机确定一名其他存活玩家并使其醉酒至下个黄昏。',roleId:'brewer',phase:'行动'},
+      {id:'lc-sailor-other',name:'水手',note:'选择一名存活玩家；决定水手或目标之一醉酒至下个黄昏。',roleId:'sailor',phase:'行动'},
+      {id:'lc-demon-other',name:'恶魔行动',note:'酒神依次选择醉酒目标与死亡目标；小恶魔选择一名死亡目标，并检查是否自杀传位。',phase:'行动',requiredAlignment:'demon'},
+      {id:'lc-scarlet-other',name:'红唇女郎',note:'若恶魔死亡且仍有至少五名玩家存活，使红唇女郎变成该恶魔并单独告知。',roleId:'scarlet-woman',phase:'结算'},
+      {id:'lc-professor-other',name:'教授',note:'若发动一次性能力，选择一名死亡玩家；如果他是镇民，使其复活。',roleId:'professor',phase:'行动'},
+      {id:'lc-gambler-other',name:'赌徒',note:'选择一名玩家并猜测其角色；猜错则赌徒死亡。',roleId:'gambler',phase:'行动'},
+      {id:'lc-undertaker-other',name:'送葬者',note:'若今天有人死于处决，展示该玩家的角色。',roleId:'undertaker',phase:'信息'},
+      {id:'lc-empath-other',name:'共情者',note:'告知两名存活邻座中邪恶玩家的数量。',roleId:'empath',phase:'信息'},
+      {id:'lc-cup-auditor-other',name:'查杯官',note:'统计今天未登记举杯的存活玩家中善良玩家的数量并告知。',roleId:'cup-auditor',phase:'信息'},
+      {id:'lc-hangover-other',name:'宿醉调查员',note:'告知今天登记过举杯的存活玩家中是否至少有一名邪恶玩家。',roleId:'hangover-investigator',phase:'信息'},
+      {id:'lc-cup-counter-other',name:'数杯师',note:'告知当前醉酒的存活玩家数量。',roleId:'cup-counter',phase:'信息'},
+      {id:'lc-comedian-other',name:'逗哏',note:'核对说书人任务；成功则展示三名玩家且至少两名善良，失败则使其醉酒至下个黄昏。',roleId:'comedian',phase:'信息'},
     ]
   }
 }];
