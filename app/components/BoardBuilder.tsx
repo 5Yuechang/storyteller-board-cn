@@ -1087,7 +1087,11 @@ export default function BoardBuilder() {
         {view !== 'roles' && gameStarted && gamePhase === 'day' && nominationsOpen && <NominationPanel dayNumber={dayNumber} seats={seats} nominations={todaysNominations} voteTracking={voteTracking} aliveCount={seats.filter((seat) => seat.alive).length} onVoteTrackingChange={setVoteTracking} onAdd={addNomination} onVotesChange={changeNominationVotes} onVotesStep={stepNominationVotes} onRemove={removeNomination} onExecute={(seatNumber) => { setNarrationSeat(seatNumber); setNarrationScene('execution'); }} onTie={() => setNarrationScene('tie')} onClose={() => setNominationsOpen(false)}/>}
 
         {view === 'roles' && <>
-          <div className="quota-strip"><span className="quota-title"><Users size={16}/>{playerCount} 人{activeSetupModifiers.length ? '调整后' : '标准'}名额</span>{alignments.map((alignment) => <span key={alignment} className={`quota quota-${alignment}`}>{alignmentMeta[alignment].short}<b>{quota[alignment]}</b></span>)}{activeSetupModifiers.map((modifier) => <span key={modifier.id} className="quota-modifier">{modifier.label}</span>)}</div>
+          <div className={`quota-strip ${activeSetupModifiers.length ? 'has-adjusted' : ''}`}><span className="quota-title"><Users size={16}/>{playerCount} 人标准名额</span>{alignments.map((alignment) => <span key={alignment} className={`quota quota-${alignment}`}>{alignmentMeta[alignment].short}<b>{baseQuota[alignment]}</b></span>)}</div>
+          {!!activeSetupModifiers.length && <div className="quota-strip is-adjusted"><span className="quota-title"><Sparkles size={16}/>调整后名额</span>{alignments.map((alignment) => {
+            const delta = quota[alignment] - baseQuota[alignment];
+            return <span key={alignment} className={`quota quota-${alignment} ${delta ? 'is-changed' : ''}`}>{alignmentMeta[alignment].short}<b>{quota[alignment]}</b>{!!delta && <small>{delta > 0 ? `+${delta}` : delta}</small>}</span>;
+          })}{activeSetupModifiers.map((modifier) => <span key={modifier.id} className="quota-modifier">{modifier.label}</span>)}</div>}
           {!!script.specialRules?.length && <div className="special-rule-strip">{script.specialRules.map((rule) => <span key={rule.name}><CircleHelp/><b>{rule.name}</b>{rule.description}</span>)}</div>}
           <div className="role-builder-layout">
             <Tabs defaultValue="townsfolk" className="role-tabs">
