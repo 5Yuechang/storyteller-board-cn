@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
-import { AlertTriangle, Bell, BookOpen, Check, ChevronDown, ChevronRight, ChevronUp, CircleHelp, Dice5, EyeOff, Gavel, GripVertical, LayoutGrid, List, Lock, Maximize2, Moon, Play, Plus, RotateCcw, ShieldCheck, Shuffle, Sparkles, Sunrise, Trash2, UserRound, Users, Volume2, X } from 'lucide-react';
+import { AlertTriangle, BookOpen, Check, ChevronDown, ChevronRight, ChevronUp, CircleHelp, Dice5, EyeOff, Gavel, GripVertical, LayoutGrid, List, Lock, Maximize2, Moon, Play, Plus, RotateCcw, ShieldCheck, Shuffle, Sparkles, Sunrise, Trash2, UserRound, Users, ScrollText, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -319,8 +319,8 @@ function NightTargetPicker({ step, selected, seats, roles, targets, onChange, on
     </NativeSelect>
   </label>)}</div>
     {onConfirmDeath && targets.some(Boolean) && <div className="night-confirm-death">{targets.filter(Boolean).map((seatNumber) => seats.find((seat) => seat.number === seatNumber)?.alive
-      ? <button key={seatNumber} type="button" onClick={() => onConfirmDeath(seatNumber)}><UserRound/>确认 {seatNumber} 号死亡</button>
-      : <span key={seatNumber}>{seatNumber} 号已死亡</span>)}<small>保护、免死等情况由说书人判断后再确认</small></div>}
+      ? <button key={seatNumber} type="button" title="保护、免死等情况由说书人判断后再确认" onClick={() => onConfirmDeath(seatNumber)}><UserRound/>确认 {seatNumber} 号死亡</button>
+      : <span key={seatNumber}>{seatNumber} 号已死亡</span>)}</div>}
   </div>;
 }
 
@@ -627,7 +627,6 @@ export default function BoardBuilder() {
     if (selected.has('drunk')) result.push(drunkFakeRoleId ? { type:'ok', text:`酒鬼假身份已分配为${script.roles.find((role) => role.id === drunkFakeRoleId)?.name ?? '不在场镇民'}。` } : { type:'warn', text:'酒鬼在场，但当前没有可用的不在场镇民作为假身份。' });
     const noEvilRole = selectedRoles.find((role) => role.setupRules?.requiresNoEvil);
     if (noEvilRole && selectedRoles.some((role) => role.alignment === 'minion' || role.alignment === 'demon')) result.push({ type:'warn', text:`${noEvilRole.name}要求没有邪恶角色在场，与当前选择冲突。` });
-    activeSetupModifiers.forEach((modifier) => result.push({ type:'ok', text:`已应用${modifier.label.replace('：','配置：')}。` }));
     if (selected.has('marionette')) result.push({ type:'info', text:'提线木偶需要与恶魔邻座，安排座位时请检查。' });
     if (selected.has('vortox')) result.push({ type:'warn', text:'涡流在场：所有镇民信息必须错误，而且每天必须有人被处决。' });
     if (selected.has('no-dashii')) result.push({ type:'info', text:'诺-达鲺在场：安排或换位后，重新检查其两侧最近的镇民并标记中毒。' });
@@ -1001,62 +1000,19 @@ export default function BoardBuilder() {
     });
   }
 
-  function playBell() {
-    const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?:typeof AudioContext }).webkitAudioContext;
-    if (!AudioContextClass) return;
-    const context = new AudioContextClass();
-    const now = context.currentTime;
-    [220,440,660,880].forEach((frequency,index) => {
-      const oscillator = context.createOscillator();
-      const gain = context.createGain();
-      oscillator.type = index ? 'sine' : 'triangle';
-      oscillator.frequency.value = frequency;
-      gain.gain.setValueAtTime(index ? .09 / index : .2,now);
-      gain.gain.exponentialRampToValueAtTime(.001,now + 2.8);
-      oscillator.connect(gain).connect(context.destination);
-      oscillator.start(now + index * .015); oscillator.stop(now + 2.9);
-    });
-    window.setTimeout(() => void context.close(),3100);
-  }
-  function playRooster() {
-    const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?:typeof AudioContext }).webkitAudioContext;
-    if (!AudioContextClass) return;
-    const context = new AudioContextClass();
-    const now = context.currentTime;
-    [[0,.34,650,940],[.38,.32,600,880],[.78,.72,720,430]].forEach(([delay,duration,start,end]) => {
-      const oscillator = context.createOscillator();
-      const gain = context.createGain();
-      oscillator.type = 'sawtooth';
-      oscillator.frequency.setValueAtTime(start,now + delay);
-      oscillator.frequency.exponentialRampToValueAtTime(end,now + delay + duration);
-      gain.gain.setValueAtTime(.001,now + delay);
-      gain.gain.exponentialRampToValueAtTime(.12,now + delay + .04);
-      gain.gain.exponentialRampToValueAtTime(.001,now + delay + duration);
-      oscillator.connect(gain).connect(context.destination);
-      oscillator.start(now + delay); oscillator.stop(now + delay + duration);
-    });
-    window.setTimeout(() => void context.close(),1800);
-  }
-
   const narrationTitles: Record<NarrationScene,string> = {
     opening:'游戏开场', nightfall:'暮色入夜', dawn:'天亮破晓', discussion:'开启自由公聊', nomination:'玩家提名', silence:'无人提名', execution:'宣判处决', tie:'平票无人处决', lastWords:'遗言结束', demonReveal:'恶魔自爆', goodWin:'善良阵营胜利', evilWin:'邪恶阵营胜利',
   };
-  const narrationBody = narrationScene === 'opening'
-    ? (openingStyle === 'long' ? narrationText.opening : shortOpening)
-    : narrationScene === 'dawn'
-      ? narrationSeats.length
-        ? `五更天晓，雄鸡啼鸣，漫漫长夜尽数落幕！诸位，睁眼细看！怎料昨夜灾祸降临，${narrationSeats.map((seat) => `${seat} 号`).join('、')}乡民不幸殒命。`
-        : '天光破晓，钟声驱散迷雾。诸位睁眼！可喜昨夜小镇安然无恙，不曾有人殒命。可诸位万万不可松懈，邪魔依旧藏在人群之内。'
-      : narrationScene === 'execution'
-        ? `一番唇枪舌战辩驳完毕，投票尘埃落定！且看票堆高悬，${narrationSeat} 号玩家被全镇乡民判以极刑！\n\n唉，世事难料，此人就此身死。虽已殒命，仍可留下遗言陈述。`
-        : narrationScene ? narrationText[narrationScene] : '';
   const dawnText = narrationSeats.length
     ? `五更天晓，雄鸡啼鸣，漫漫长夜尽数落幕！诸位，睁眼细看！怎料昨夜灾祸降临，${narrationSeats.map((seat) => `${seat} 号`).join('、')}乡民不幸殒命。`
     : '天光破晓，钟声驱散迷雾。诸位睁眼！可喜昨夜小镇安然无恙，不曾有人殒命。可诸位万万不可松懈，邪魔依旧藏在人群之内。';
-  const currentStageNarration = !gameStarted || gamePhase === 'firstNight'
+  const narrationBody = narrationScene === 'opening'
     ? (openingStyle === 'long' ? narrationText.opening : shortOpening)
-    : gamePhase === 'day' ? dawnText : narrationText.nightfall;
-  const currentStageCueTitle = !gameStarted ? '游戏开场' : gamePhase === 'firstNight' ? '第1夜 · 游戏开场' : gamePhase === 'day' ? `${phaseName(gamePhase,dayNumber)} · 天亮破晓` : `${phaseName(gamePhase,dayNumber)} · 暮色入夜`;
+    : narrationScene === 'dawn'
+      ? dawnText
+      : narrationScene === 'execution'
+        ? `一番唇枪舌战辩驳完毕，投票尘埃落定！且看票堆高悬，${narrationSeat} 号玩家被全镇乡民判以极刑！\n\n唉，世事难料，此人就此身死。虽已殒命，仍可留下遗言陈述。`
+        : narrationScene ? narrationText[narrationScene] : '';
 
   if (!historyReady) return <main className="game-restoring"><span className="brand-mark"><img src={publicAsset('/brand-mark.svg')} alt=""/></span><p>正在恢复本局…</p></main>;
 
@@ -1077,9 +1033,9 @@ export default function BoardBuilder() {
           <button className={view === 'night' ? 'is-active' : ''} onClick={() => setView('night')}><Moon/>唤醒顺序</button>
           <button className={view === 'history' ? 'is-active' : ''} onClick={() => setView('history')}><BookOpen/>对局日志</button>
         </nav>
-        {view !== 'roles' && <section className={`phase-bar ${gameStarted ? 'is-running' : ''}`}><div><span className="phase-dot"/><p><small>当前阶段</small><strong>{gameStarted ? phaseName(gamePhase,dayNumber) : '尚未开始记录'}</strong></p></div>{gameStarted ? <Button onClick={advancePhase}>进入下一阶段<ChevronRight/></Button> : <Button onClick={startGame}><Play/>开始记录</Button>}{gameStarted && gamePhase === 'day' && <Button className={`nomination-shortcut ${nominationsOpen ? 'is-open' : ''}`} variant="outline" onClick={() => setNominationsOpen((open) => !open)}><Gavel/>今日提名{todaysNominations.length ? ` · ${todaysNominations.length}` : ''}</Button>}{gameStarted && view !== 'seats' && <Button className="narration-shortcut" variant="outline" onClick={() => setQuickLinesOpen((open) => !open)}><Volume2/>台词提示</Button>}<button className="log-shortcut" onClick={() => setView('history')}><BookOpen/><span>{gameLog.length} 条记录</span></button><Button className="reset-game-button" variant="outline" onClick={resetCurrentGame}><RotateCcw/>重置本局</Button></section>}
-        {view !== 'roles' && view !== 'seats' && quickLinesOpen && <section className="quick-lines" aria-label="临场旁白">
-          <div><span><b>台词提示</b><small>夜晚也可查看；选择一条后本面板保持展开</small></span><button onClick={() => setQuickLinesOpen(false)} aria-label="关闭台词提示"><X/></button></div>
+        {view !== 'roles' && <section className={`phase-bar ${gameStarted ? 'is-running' : ''}`}><div><span className="phase-dot"/><p><small>当前阶段</small><strong>{gameStarted ? phaseName(gamePhase,dayNumber) : '尚未开始记录'}</strong></p></div>{gameStarted ? <Button onClick={advancePhase}>进入下一阶段<ChevronRight/></Button> : <Button onClick={startGame}><Play/>开始记录</Button>}{gameStarted && gamePhase === 'day' && <Button className={`nomination-shortcut ${nominationsOpen ? 'is-open' : ''}`} variant="outline" onClick={() => setNominationsOpen((open) => !open)}><Gavel/>提名{todaysNominations.length ? ` · ${todaysNominations.length}` : ''}</Button>}{gameStarted && <Button className={`narration-shortcut ${quickLinesOpen ? 'is-open' : ''}`} variant="outline" onClick={() => setQuickLinesOpen((open) => !open)}><ScrollText/>台词</Button>}</section>}
+        {view !== 'roles' && quickLinesOpen && <section className="quick-lines" aria-label="临场旁白">
+          <div><span><b>台词</b></span><button onClick={() => setQuickLinesOpen(false)} aria-label="关闭台词提示"><X/></button></div>
           <nav>{([
             [gamePhase === 'day' ? 'dawn' : gamePhase === 'firstNight' ? 'opening' : 'nightfall','当前阶段'],['discussion','开启公聊'],['nomination','玩家提名'],['silence','无人提名'],['execution','宣判处决'],['tie','平票无人处决'],['lastWords','遗言结束'],['demonReveal','恶魔自爆'],['goodWin','好人胜利'],['evilWin','邪恶胜利'],
           ] as [NarrationScene,string][]).map(([scene,label]) => <button key={`${scene}-${label}`} onClick={() => { if (scene === 'execution') setNarrationSeat(activeSeat); setNarrationScene(scene); }}>{label}</button>)}</nav>
@@ -1102,12 +1058,12 @@ export default function BoardBuilder() {
               <div className="board-heading"><div><span className="eyebrow">本局阵容</span><h2>当前配板</h2></div><span className="total-count">{selectedRoleInstances.length}<small>/{playerCount}</small></span></div>
               <div className="board-actions"><Button className="random-board" onClick={() => buildBoard(true)}><Dice5/>随机配板</Button><Button variant="outline" onClick={() => buildBoard(false)}><Sparkles/>按名额补齐</Button><Button variant="outline" onClick={() => { setSelected(new Set(locked)); setRoleCopies(Object.fromEntries([...locked].map((id) => [id,Math.max(1,roleCopies[id] ?? 1)]))); resetRoundState(); }}><RotateCcw/>清空未锁定</Button></div>
               {selected.has('drunk') && drunkRole && <section className="drunk-fake-role"><div className="drunk-fake-heading"><RoleIcon role={drunkRole}/><span><b>酒鬼的假身份</b><small>自动从不在场镇民中选择，并避开恶魔伪装</small></span><button onClick={randomizeDrunkFakeRole} disabled={!drunkFakeOptions.length}><Shuffle/>换一个</button></div><NativeSelect value={drunkFakeRoleId ?? ''} onChange={(event) => setDrunkFakeRoleId(event.target.value || null)} aria-label="酒鬼的假身份"><NativeSelectOption value="">暂无可用镇民</NativeSelectOption>{drunkFakeOptions.map((role) => <NativeSelectOption key={role.id} value={role.id}>{role.name}</NativeSelectOption>)}</NativeSelect></section>}
-              <section className="demon-bluffs"><div className="bluff-heading"><div><EyeOff/><span><b>给恶魔的三个伪装</b><small>按当前阵营名额筛选不在场身份；外来者名额为 0 时只提供镇民</small></span></div><button onClick={randomizeBluffs} disabled={!selectedRoles.some((role) => role.alignment === 'demon') || availableBluffs.length < 3}><Shuffle/>随机准备</button></div>
+              <section className="demon-bluffs"><div className="bluff-heading"><div><EyeOff/><span><b>给恶魔的三个伪装</b><small>从不在场的善良角色中选三个</small></span></div><button onClick={randomizeBluffs} disabled={!selectedRoles.some((role) => role.alignment === 'demon') || availableBluffs.length < 3}><Shuffle/>随机准备</button></div>
                 {selectedRoles.some((role) => role.alignment === 'demon') ? <div className="bluff-slots">{demonBluffs.map((roleId,index) => {
                   const role = script.roles.find((item) => item.id === roleId);
                   const options = availableBluffs.filter((item) => !demonBluffs.includes(item.id) || item.id === roleId);
                   return <label className="bluff-slot" key={index}><span>{role ? <RoleIcon role={role}/> : <b>{index + 1}</b>}</span><NativeSelect value={roleId ?? ''} onChange={(event) => setBluff(index,event.target.value || null)} aria-label={`说书人准备的第${index + 1}个伪装`}><NativeSelectOption value="">说书人选择</NativeSelectOption>{options.map((item) => <NativeSelectOption key={item.id} value={item.id}>{item.name} · {alignmentMeta[item.alignment].short}</NativeSelectOption>)}</NativeSelect></label>;
-                })}</div> : <p className="bluff-empty">选入恶魔后，由说书人在这里准备身份；随机配板会自动准备三个不在场的善良角色。</p>}
+                })}</div> : <p className="bluff-empty">选入恶魔后再准备。</p>}
               </section>
               <div className="selected-groups">{alignments.map((alignment) => <section key={alignment} className={`selected-group group-${alignment}`}><div><span>{alignmentMeta[alignment].short}</span><b>{totals[alignment]} / {quota[alignment]}</b></div><ul>{selectedRoles.filter((role) => role.alignment === alignment).map((role) => <li key={role.id}><RoleIcon role={role} className="mini-role-icon"/>{role.name}{(roleCopies[role.id] ?? 1) > 1 && <b>×{roleCopies[role.id]}</b>}{locked.has(role.id) && <Lock size={11}/>}</li>)}</ul>{!totals[alignment] && <p>尚未选择</p>}</section>)}</div>
               <section className="validation"><h3><ShieldCheck size={17}/>基础校验</h3><div className="message-list">{messages.map((message,index) => <div key={`${message.text}-${index}`} className={`message message-${message.type}`}>{message.type === 'warn' ? <AlertTriangle size={15}/> : message.type === 'ok' ? <Check size={15}/> : <CircleHelp size={15}/>}<span>{message.text}</span></div>)}</div></section>
@@ -1116,15 +1072,7 @@ export default function BoardBuilder() {
         </>}
 
         {view === 'seats' && <section className="seat-workspace">
-          <section className={`stage-cue-panel cue-${gamePhase}`} aria-label="当前阶段台词">
-            <header><div><span>当前阶段台词</span><h3>{currentStageCueTitle}</h3></div><div className="stage-cue-sound">{gamePhase === 'day' ? <Button variant="outline" onClick={playRooster}><Volume2/>鸡鸣</Button> : <Button variant="outline" onClick={playBell}><Bell/>钟声</Button>}</div></header>
-            {(!gameStarted || gamePhase === 'firstNight') && <div className="stage-cue-options"><button className={openingStyle === 'long' ? 'is-active' : ''} onClick={() => setOpeningStyle('long')}>悬疑长篇</button><button className={openingStyle === 'short' ? 'is-active' : ''} onClick={() => setOpeningStyle('short')}>精简版</button></div>}
-            <p>{currentStageNarration}</p>
-            <footer><span>临场台词</span><div>{([
-              ['discussion','开启公聊'],['nomination','玩家提名'],['silence','无人提名'],['execution','宣判处决'],['tie','平票'],['lastWords','遗言结束'],['demonReveal','恶魔自爆'],['goodWin','好人胜利'],['evilWin','邪恶胜利'],
-            ] as [NarrationScene,string][]).map(([scene,label]) => <button key={scene} onClick={() => { if (scene === 'execution') setNarrationSeat(activeSeat); setNarrationScene(scene); }}>{label}</button>)}</div></footer>
-          </section>
-          <div className="view-heading"><div><span className="eyebrow">圆桌魔典</span><h3>环形座位</h3><p>拖动圆桌空白处旋转视角；拖动座位卡到另一张卡可交换双方状态。</p></div><div><Button onClick={randomizeSeats} disabled={!selectedRoleInstances.length}><Shuffle/>随机入座</Button><Button variant="outline" onClick={() => setRingRotation(0)} disabled={Math.abs(ringRotation) < 0.5}><RotateCcw/>方向归零</Button><Button variant="outline" onClick={() => { setSeats((current) => makeSeats(playerCount,current)); setAbilityTargets({}); setSnakeSwap(null); setAutomaticStatusEffects([]); }}><Trash2/>清空座位</Button></div></div>
+          <div className="view-heading"><div><span className="eyebrow">圆桌魔典</span><h3>环形座位</h3></div><div><Button onClick={randomizeSeats} disabled={!selectedRoleInstances.length}><Shuffle/>随机入座</Button><Button variant="outline" onClick={() => setRingRotation(0)} disabled={Math.abs(ringRotation) < 0.5}><RotateCcw/>方向归零</Button><Button variant="outline" onClick={() => { setSeats((current) => makeSeats(playerCount,current)); setAbilityTargets({}); setSnakeSwap(null); setAutomaticStatusEffects([]); }}><Trash2/>清空座位</Button></div></div>
           <SeatMap seats={seats} roles={script.roles} activeSeat={activeSeat} targetMarks={targetMarks} rotation={ringRotation} drunkFakeRoleId={drunkFakeRoleId} onRotationChange={setRingRotation} onSelect={setActiveSeat} onSwap={swapSeats}/>
           <div className="seat-editor">
             <div className="seat-editor-number"><span>{activeSeatState.number}</span><div><b>{activeSeatState.number}号座位</b><small>{activeSeatState.alive ? '当前存活' : '当前死亡'}</small></div><input className="seat-name-input" value={activeSeatState.name ?? ''} maxLength={12} placeholder="玩家昵称（可选）" onChange={(event) => changeSeatName(activeSeatState.number,event.target.value)} aria-label={`${activeSeatState.number}号玩家昵称`}/></div>
@@ -1135,17 +1083,15 @@ export default function BoardBuilder() {
         </section>}
 
         {view === 'night' && <section className="night-workspace">
-          <div className="view-heading"><div><span className="eyebrow">夜间流程</span><h3>夜间唤醒顺序</h3><p>只显示当前配板相关步骤；完成后勾选，座位号会自动关联。</p></div><Button variant="outline" onClick={() => setCompletedSteps(new Set())}><RotateCcw/>重置进度</Button></div>
-          <div className="night-rule-banner"><Moon/><div><strong>夜序已按主动能力过滤</strong><span>“每夜”包含首夜；“每夜*”从第二夜开始。死亡、失去能力及已使用的一次性角色会按规则自动跳过。</span></div></div>
+          <div className="view-heading"><div><span className="eyebrow">夜间流程</span><h3>夜间唤醒顺序</h3><p>只显示当前配板中需要唤醒的角色；已死亡或失去能力的会自动跳过。</p></div><Button variant="outline" onClick={() => setCompletedSteps(new Set())}><RotateCcw/>重置进度</Button></div>
           <div className="night-control-row"><div className="night-toggle"><button className={nightMode === 'first' ? 'is-active' : ''} onClick={() => setNightMode('first')}><Moon/>第1夜</button><button className={nightMode === 'other' ? 'is-active' : ''} onClick={() => setNightMode('other')}><Sunrise/>之后夜晚</button></div><div className="night-display-toggle"><button className={!nightFocusMode ? 'is-active' : ''} onClick={() => setNightFocusMode(false)}><List/>完整列表</button><button className={nightFocusMode ? 'is-active' : ''} onClick={() => setNightFocusMode(true)}><Maximize2/>专注模式</button></div></div>
           {nightFocusMode
             ? <NightFocus title={nightMode === 'first' ? '第1夜' : '之后夜晚'} steps={nightSteps} selected={selected} seats={seats} roles={script.roles} roleCopies={roleCopies} bluffs={demonBluffs} completed={completedSteps} targets={abilityTargets} onToggle={toggleNightStep} onTargetChange={changeNightTarget} onConfirmDeath={confirmNightDeath}/>
             : <NightList title={nightMode === 'first' ? '第1夜' : '之后夜晚'} steps={nightSteps} selected={selected} seats={seats} roles={script.roles} roleCopies={roleCopies} bluffs={demonBluffs} completed={completedSteps} targets={abilityTargets} onToggle={toggleNightStep} onTargetChange={changeNightTarget} onConfirmDeath={confirmNightDeath}/>}
-          <p className="night-footnote">提示：中毒、醉酒、角色变化及自定义能力可能改变实际处理方式，说书人应结合当前场况判断。</p>
         </section>}
 
         {view === 'history' && <section className="history-workspace">
-          <div className="view-heading"><div><span className="eyebrow">本局复盘</span><h3>对局日志</h3><p>关键操作自动记录，也可以随时补充说书人备注。</p></div>{gameLog.length > 0 && <Button variant="outline" onClick={clearHistory}><Trash2/>清空日志</Button>}</div>
+          <div className="view-heading"><div><span className="eyebrow">本局复盘</span><h3>对局日志</h3><p>关键操作自动记录，也可以随时补充说书人备注。</p></div><div>{gameLog.length > 0 && <Button variant="outline" onClick={clearHistory}><Trash2/>清空日志</Button>}<Button className="reset-game-button" variant="outline" onClick={resetCurrentGame}><RotateCcw/>重置本局</Button></div></div>
           <form className="quick-note" onSubmit={(event) => { event.preventDefault(); submitManualNote(); }}><Input value={manualNote} onChange={(event) => setManualNote(event.target.value)} placeholder="记录提名、处决、能力结果或其他关键事件…" aria-label="对局备注"/><Button type="submit" disabled={!manualNote.trim()}><Plus/>添加记录</Button></form>
           <div className="history-timeline">{gameLog.length ? gameLog.map((entry,index) => {
             const previous = gameLog[index - 1];
@@ -1177,11 +1123,9 @@ export default function BoardBuilder() {
         <div className="narration-copy">{narrationBody.split('\n').map((line,index) => line ? <p key={index}>{line}</p> : <span key={index}/>)}</div>
         <p className="narration-rule">只照读座位号，不补充或推测死亡原因。</p>
         <footer>
-          {(narrationScene === 'opening' || narrationScene === 'nightfall' || narrationScene === 'lastWords' || narrationScene === 'demonReveal') && <Button variant="outline" onClick={playBell}><Bell/>播放钟声</Button>}
           {narrationScene === 'execution' && (seats.find((seat) => seat.number === narrationSeat)?.alive
             ? <Button variant="destructive" onClick={() => markSeatDead(narrationSeat,`${narrationSeat}号被处决`)}><UserRound/>确认处决 {narrationSeat} 号</Button>
             : <Button variant="outline" disabled>{narrationSeat} 号已死亡</Button>)}
-          {narrationScene === 'dawn' && <Button variant="outline" onClick={playRooster}><Volume2/>播放鸡鸣</Button>}
           {narrationScene === 'dawn' && <Button onClick={() => setNarrationScene('discussion')}>接着开启公聊<ChevronRight/></Button>}
           <Button onClick={() => setNarrationScene(null)}>读完，关闭</Button>
         </footer>
