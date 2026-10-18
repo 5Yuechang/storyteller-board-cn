@@ -597,11 +597,11 @@ export default function BoardBuilder() {
     if (noEvilRole && selectedRoles.some((role) => role.alignment === 'minion' || role.alignment === 'demon')) result.push({ type:'warn', text:`${noEvilRole.name}要求没有邪恶角色在场，与当前选择冲突。` });
     if (selected.has('marionette')) result.push({ type:'info', text:'提线木偶需要与恶魔邻座，安排座位时请检查。' });
     if (selected.has('vortox')) result.push({ type:'warn', text:'涡流在场：所有镇民信息必须错误，而且每天必须有人被处决。' });
-    if (selected.has('no-dashii')) result.push({ type:'info', text:'诺-达鲺在场：安排或换位后，重新检查其两侧最近的镇民并标记中毒。' });
+    if (selected.has('no-dashii')) result.push({ type:'info', text:'诺-达鲺在场：安排座位后，检查其两侧最近的镇民并标记中毒。' });
     const assignedCount = seats.filter((seat) => seat.roleId).length;
     if (assignedCount && assignedCount < playerCount) result.push({ type:'info', text:`座位身份已分配 ${assignedCount}/${playerCount}。` });
     return result;
-  }, [activeSetupModifiers, drunkFakeRoleId, playerCount, quota, script.roles, seats, selected, selectedRoles, totals]);
+  }, [drunkFakeRoleId, playerCount, quota, script.roles, seats, selected, selectedRoles, totals]);
 
   function addLog(kind: LogKind, title: string, detail?: string, phase = gamePhase, day = dayNumber) {
     const createdAt = Date.now();

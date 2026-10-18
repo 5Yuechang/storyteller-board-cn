@@ -538,4 +538,4 @@ button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-vis
 /* 手机：头像移到右上角与座位号同行，角色名独占一行。 */
 @media(max-width:760px){.seat-token{padding:5px 4px}.seat-token strong{display:block;margin-top:9px;font-size:11px;letter-spacing:0;text-align:center}.seat-token strong .role-icon{position:absolute;top:4px;right:4px;width:22px;height:22px}.seat-ring.is-crowded .seat-token{width:54px;min-height:40px;padding:4px 2px}.seat-ring.is-crowded .seat-token b{font-size:9px}.seat-ring.is-crowded .seat-token strong{margin-top:7px;font-size:9.5px}.seat-ring.is-crowded .seat-token strong .role-icon{width:18px;height:18px;top:3px;right:3px}}
 /* 触屏不在圆桌上弹出技能卡（无法点掉且会挡住座位），改在下方座位编辑里显示。 */
-@media(hover:none){.seat-token>.seat-ability-card{display:none!important}.seat-editor-ability{display:block}}
+@media(hover:none){.seat-token>.seat-ability-card{display:none!important}.night-list-ability-card{display:none!important}.seat-editor-ability{display:block}.night-list [data-slot="checkbox"],.role-card [data-slot="checkbox"]{position:relative}.night-list [data-slot="checkbox"]::after,.role-card [data-slot="checkbox"]::after{content:"";position:absolute;inset:-14px}}
