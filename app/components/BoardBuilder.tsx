@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
-import { AlertTriangle, BookOpen, Check, ChevronDown, ChevronRight, ChevronUp, CircleHelp, Dice5, EyeOff, Gavel, GripVertical, LayoutGrid, List, Lock, Maximize2, Moon, Play, Plus, RotateCcw, ShieldCheck, Shuffle, Sparkles, Sunrise, Trash2, UserRound, Users, ScrollText, X } from 'lucide-react';
+import { AlertTriangle, BookOpen, Check, ChevronDown, ChevronRight, ChevronUp, CircleHelp, Dice5, EyeOff, Gavel, GripVertical, LayoutGrid, List, Maximize2, Moon, Play, Plus, RotateCcw, ShieldCheck, Shuffle, Sparkles, Sunrise, Trash2, UserRound, Users, ScrollText, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -22,7 +22,7 @@ type Nomination = { id:string; dayNumber:number; nominator:number|null; nominee:
 type AutomaticStatusEffect = { stepId:string; targetIndex:number; roleId:string; seatNumber:number; status:SeatStatus; expires:'manual'|'nextDawn'|'nextDusk'; added?:boolean };
 type SnakeSwap = { stepId:string; charmerSeat:number; demonSeat:number; charmerRoleId:string; demonRoleId:string; addedPoison:boolean };
 type SavedGameState = {
-  version:number; savedAt:number; scriptId:string; playerCount:number; selected:string[]; locked:string[]; view:ViewMode;
+  version:number; savedAt:number; scriptId:string; playerCount:number; selected:string[]; locked?:string[]; view:ViewMode;
   seats:Seat[]; activeSeat:number; nightMode:'first'|'other'; nightFocusMode:boolean; completedSteps:string[];
   gameStarted:boolean; gamePhase:GamePhase; dayNumber:number; gameLog:LogEntry[]; demonBluffs:(string|null)[];
   abilityTargets?:Record<string,number[]>; automaticPoisonSeat?:number|null; ringRotation?:number; drunkFakeRoleId?:string|null;
@@ -117,7 +117,7 @@ function RoleIcon({ role, className = '' }: { role: Role; className?: string }) 
   return <img className={`role-icon ${className}`} src={role.image ?? publicAsset(`/roles/${role.id}.webp`)} alt="" aria-hidden="true"/>;
 }
 
-function RoleCard({ role, selected, locked, copies, setupChoice, onSelect, onLock, onCopiesChange, onSetupChoiceChange }: { role: Role; selected: boolean; locked: boolean; copies:number; setupChoice?:number; onSelect: () => void; onLock: () => void; onCopiesChange:(count:number) => void; onSetupChoiceChange:(value:number) => void }) {
+function RoleCard({ role, selected, copies, setupChoice, onSelect, onCopiesChange, onSetupChoiceChange }: { role: Role; selected: boolean; copies:number; setupChoice?:number; onSelect: () => void; onCopiesChange:(count:number) => void; onSetupChoiceChange:(value:number) => void }) {
   const [expanded, setExpanded] = useState(false);
   return <article className={`role-card role-${role.alignment} ${selected ? 'is-selected' : ''} ${expanded ? 'is-expanded' : ''}`}>
     <div className="role-topline">
@@ -127,7 +127,6 @@ function RoleCard({ role, selected, locked, copies, setupChoice, onSelect, onLoc
       <span className="timing">{role.timing}</span>
       {role.automation && <span className={`automation-state ${role.automation.configured ? 'is-ready' : 'is-manual'}`}>{role.automation.configured ? '自动' : '手动'}</span>}
       <button className="role-expand" onClick={() => setExpanded((open) => !open)} aria-expanded={expanded} aria-label={`${expanded ? '收起' : '查看'}${role.name}技能`}>{expanded ? <ChevronUp/> : <ChevronDown/>}</button>
-      <button className={`lock-button ${locked ? 'is-locked' : ''}`} onClick={onLock} aria-label={`${locked ? '取消锁定' : '锁定'}${role.name}`} title={locked ? '取消锁定' : '锁定角色'}><Lock size={14}/></button>
     </div>
     <div className="role-details"><p>{role.ability}</p>
       <div className="role-foot">{role.setup && <span className="setup">配置：{role.setup}</span>}{role.note && <span className="data-note"><CircleHelp size={12}/>{role.note}</span>}</div>
@@ -139,40 +138,13 @@ function RoleCard({ role, selected, locked, copies, setupChoice, onSelect, onLoc
   </article>;
 }
 
-function SeatMap({ seats, roles, activeSeat, targetMarks, rotation, drunkFakeRoleId, onRotationChange, onSelect, onSwap }: { seats: Seat[]; roles: Role[]; activeSeat: number; targetMarks:Record<number,string[]>; rotation:number; drunkFakeRoleId:string|null; onRotationChange:(rotation:number) => void; onSelect: (number: number) => void; onSwap: (from: number, to: number) => void }) {
-  const [draggingSeat, setDraggingSeat] = useState<number|null>(null);
-  const [dragTarget, setDragTarget] = useState<number|null>(null);
-  const [dragOffset, setDragOffset] = useState({ x:0, y:0 });
+function SeatMap({ seats, roles, activeSeat, targetMarks, rotation, drunkFakeRoleId, onRotationChange, onSelect }: { seats: Seat[]; roles: Role[]; activeSeat: number; targetMarks:Record<number,string[]>; rotation:number; drunkFakeRoleId:string|null; onRotationChange:(rotation:number) => void; onSelect: (number: number) => void }) {
   const [rotating, setRotating] = useState(false);
-  const dragStart = useRef({ x:0, y:0 });
-  const didDrag = useRef(false);
   const rotationDrag = useRef<{ pointerId:number; startAngle:number; startRotation:number }|null>(null);
   const aliveCount = seats.filter((seat) => seat.alive).length;
   const deathsUntilEvilWin = Math.max(0, aliveCount - 2);
   const demonSeats = seats.filter((seat) => roles.find((role) => role.id === seat.roleId)?.alignment === 'demon');
   const demonDefeated = demonSeats.length > 0 && demonSeats.every((seat) => !seat.alive);
-  const beginDrag = (event: ReactPointerEvent<HTMLButtonElement>, seatNumber: number) => {
-    if (event.button !== 0) return;
-    dragStart.current = { x:event.clientX, y:event.clientY };
-    didDrag.current = false;
-    setDraggingSeat(seatNumber); setDragTarget(null); setDragOffset({ x:0, y:0 });
-    event.currentTarget.setPointerCapture(event.pointerId);
-  };
-  const moveDrag = (event: ReactPointerEvent<HTMLButtonElement>) => {
-    if (draggingSeat === null) return;
-    const offset = { x:event.clientX - dragStart.current.x, y:event.clientY - dragStart.current.y };
-    if (Math.hypot(offset.x,offset.y) < 7 && !didDrag.current) return;
-    didDrag.current = true; setDragOffset(offset);
-    const targetNumber = document.elementsFromPoint(event.clientX,event.clientY).map((element) => Number(element.closest<HTMLElement>('[data-seat-number]')?.dataset.seatNumber)).find((number) => Number.isFinite(number) && number !== draggingSeat);
-    setDragTarget(targetNumber ?? null);
-  };
-  const finishDrag = (event: ReactPointerEvent<HTMLButtonElement>) => {
-    if (draggingSeat === null) return;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-    const targetNumber = document.elementsFromPoint(event.clientX,event.clientY).map((element) => Number(element.closest<HTMLElement>('[data-seat-number]')?.dataset.seatNumber)).find((number) => Number.isFinite(number) && number !== draggingSeat);
-    if (didDrag.current && targetNumber !== undefined) onSwap(draggingSeat,targetNumber);
-    setDraggingSeat(null); setDragTarget(null); setDragOffset({ x:0, y:0 });
-  };
   const pointerAngle = (event: ReactPointerEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     return Math.atan2(event.clientY - (rect.top + rect.height / 2),event.clientX - (rect.left + rect.width / 2)) * 180 / Math.PI;
@@ -208,20 +180,14 @@ function SeatMap({ seats, roles, activeSeat, targetMarks, rotation, drunkFakeRol
       return <button
         key={seat.number}
         data-seat-number={seat.number}
-        className={`seat-token ${role ? `seat-${role.alignment}` : ''} ${side ? `seat-side-${side}` : ''} ${seat.alive ? 'is-alive' : 'is-dead'} ${activeSeat === seat.number ? 'is-active' : ''} ${draggingSeat === seat.number ? 'is-dragging' : ''} ${dragTarget === seat.number ? 'is-drop-target' : ''}`}
+        className={`seat-token ${role ? `seat-${role.alignment}` : ''} ${side ? `seat-side-${side}` : ''} ${seat.alive ? 'is-alive' : 'is-dead'} ${activeSeat === seat.number ? 'is-active' : ''}`}
         style={{
           '--seat-left': `${50 + Math.sin(angle) * 43}%`,
           '--seat-top': `${50 - Math.cos(angle) * 43}%`,
           '--seat-left-mobile': `${50 + Math.sin(angle) * 38}%`,
           '--seat-top-mobile': `${50 - Math.cos(angle) * 38}%`,
-          '--drag-x': draggingSeat === seat.number ? `${dragOffset.x}px` : '0px',
-          '--drag-y': draggingSeat === seat.number ? `${dragOffset.y}px` : '0px',
         } as CSSProperties}
-        onPointerDown={(event) => beginDrag(event,seat.number)}
-        onPointerMove={moveDrag}
-        onPointerUp={finishDrag}
-        onPointerCancel={() => { setDraggingSeat(null); setDragTarget(null); setDragOffset({ x:0, y:0 }); didDrag.current = false; }}
-        onClick={() => { if (didDrag.current) { didDrag.current = false; return; } onSelect(seat.number); }}
+        onClick={() => onSelect(seat.number)}
         aria-label={`${seatTitle(seat)}，${role?.name ?? '未分配'}，${seat.alive ? '存活' : '死亡'}`}
         aria-describedby={role ? `seat-ability-${seat.number}` : undefined}
       >
@@ -427,7 +393,6 @@ export default function BoardBuilder() {
   const [scriptId, setScriptId] = useState(scripts[0].id);
   const [playerCount, setPlayerCount] = useState(10);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [locked, setLocked] = useState<Set<string>>(new Set());
   const [roleCopies, setRoleCopies] = useState<Record<string,number>>({});
   const [setupChoices, setSetupChoices] = useState<Record<string,number>>({});
   const [view, setView] = useState<ViewMode>('roles');
@@ -543,7 +508,6 @@ export default function BoardBuilder() {
         const savedChoice = Number(saved.setupChoices?.[role.id]);
         return [[role.id,rule.options.includes(savedChoice) ? savedChoice : rule.default]];
       })));
-      setLocked(new Set(Array.isArray(saved.locked) ? saved.locked.filter((id) => roleIds.has(id)) : []));
       setView(['roles','seats','night','history'].includes(saved.view ?? '') ? saved.view as ViewMode : 'roles');
       setSeats(restoredSeats); setActiveSeat(Math.min(Math.max(1,Number(saved.activeSeat) || 1),savedCount));
       setNightMode(saved.nightMode === 'other' ? 'other' : 'first'); setNightFocusMode(Boolean(saved.nightFocusMode));
@@ -598,11 +562,11 @@ export default function BoardBuilder() {
     if (!historyReady) return;
     const timer = window.setTimeout(() => {
       if (suspendAutosave.current) return;
-      const state: SavedGameState = { version:11, savedAt:Date.now(), scriptId, playerCount, selected:[...selected], locked:[...locked], roleCopies, setupChoices, view, seats, activeSeat, nightMode, nightFocusMode, completedSteps:[...completedSteps], abilityTargets, automaticStatusEffects, snakeSwap, gameStarted, gamePhase, dayNumber, gameLog, demonBluffs, ringRotation, drunkFakeRoleId, announcedDeadSeats:[...announcedDeadSeats], lastDawnDeadSeats:narrationSeats, openingStyle, nominations, voteTracking };
+      const state: SavedGameState = { version:11, savedAt:Date.now(), scriptId, playerCount, selected:[...selected], roleCopies, setupChoices, view, seats, activeSeat, nightMode, nightFocusMode, completedSteps:[...completedSteps], abilityTargets, automaticStatusEffects, snakeSwap, gameStarted, gamePhase, dayNumber, gameLog, demonBluffs, ringRotation, drunkFakeRoleId, announcedDeadSeats:[...announcedDeadSeats], lastDawnDeadSeats:narrationSeats, openingStyle, nominations, voteTracking };
       try { window.localStorage?.setItem(localGameKey,JSON.stringify(state)); } catch { /* Storage may be unavailable in private browsing. */ }
     }, 180);
     return () => window.clearTimeout(timer);
-  }, [abilityTargets, activeSeat, announcedDeadSeats, automaticStatusEffects, completedSteps, dayNumber, demonBluffs, drunkFakeRoleId, gameLog, gamePhase, gameStarted, historyReady, locked, narrationSeats, nightFocusMode, nightMode, nominations, openingStyle, playerCount, ringRotation, roleCopies, scriptId, seats, selected, setupChoices, snakeSwap, view, voteTracking]);
+  }, [abilityTargets, activeSeat, announcedDeadSeats, automaticStatusEffects, completedSteps, dayNumber, demonBluffs, drunkFakeRoleId, gameLog, gamePhase, gameStarted, historyReady, narrationSeats, nightFocusMode, nightMode, nominations, openingStyle, playerCount, ringRotation, roleCopies, scriptId, seats, selected, setupChoices, snakeSwap, view, voteTracking]);
 
   useEffect(() => {
     setDemonBluffs((current) => current.map((id) => {
@@ -644,19 +608,12 @@ export default function BoardBuilder() {
   }
   function resetRoundState() { setSeats((current) => makeSeats(playerCount,current)); setActiveSeat(1); setCompletedSteps(new Set()); setAbilityTargets({}); setSnakeSwap(null); setAutomaticStatusEffects([]); setGameStarted(false); setGamePhase('firstNight'); setDayNumber(1); setGameLog([]); setAnnouncedDeadSeats(new Set()); setNarrationSeats([]); setNominations([]); }
   function toggleRole(role: Role) {
-    if (locked.has(role.id)) return;
     const removing = selected.has(role.id);
     setSelected((current) => { const next = new Set(current); if (next.has(role.id)) next.delete(role.id); else next.add(role.id); return next; });
     setRoleCopies((current) => { const next = { ...current }; if (removing) delete next[role.id]; else next[role.id] = 1; return next; });
     if (!removing && role.setupRules?.outsiderDelta) setSetupChoices((current) => ({ ...current, [role.id]:role.setupRules!.outsiderDelta!.default }));
     setSeats((current) => current.map((seat) => seat.roleId === role.id ? { ...seat, roleId:null } : seat));
     setCompletedSteps(new Set());
-  }
-  function toggleLock(role: Role) {
-    setLocked((current) => { const next = new Set(current); if (next.has(role.id)) next.delete(role.id); else next.add(role.id); return next; });
-    setSelected((current) => new Set(current).add(role.id));
-    setRoleCopies((current) => ({ ...current, [role.id]:Math.max(1,current[role.id] ?? 1) }));
-    if (role.setupRules?.outsiderDelta) setSetupChoices((current) => ({ ...current, [role.id]:current[role.id] ?? role.setupRules!.outsiderDelta!.default }));
   }
   function changeRoleCopies(role:Role, requested:number) {
     const count = Math.min(Math.max(1,requested),role.maxCopies ?? 1);
@@ -674,11 +631,13 @@ export default function BoardBuilder() {
     setCompletedSteps(new Set());
   }
   function buildBoard(random: boolean) {
-    const next = new Set(locked);
-    const nextCopies:Record<string,number> = Object.fromEntries([...locked].map((id) => [id,Math.max(1,roleCopies[id] ?? 1)]));
+    // 随机配板从零开始；按名额补齐保留已选角色，只补空缺。
+    const keep = random ? new Set<string>() : new Set(selected);
+    const next = new Set(keep);
+    const nextCopies:Record<string,number> = Object.fromEntries([...keep].map((id) => [id,Math.max(1,roleCopies[id] ?? 1)]));
     const alignmentCount = (alignment:Alignment) => script.roles.filter((role) => role.alignment === alignment && next.has(role.id)).reduce((total,role) => total + Math.max(1,nextCopies[role.id] ?? 1),0);
     const changesSetup = (role:Role) => Boolean(role.setupRules?.outsiderDelta || role.setupRules?.requiresNoEvil);
-    // “无邪恶角色”会把整局变成特殊玩法，只有锁定时才会出现在配板里。
+    // “无邪恶角色”会把整局变成特殊玩法，只有手动选入时才会出现在配板里。
     const addToAlignment = (alignment: Alignment, target: number, allowSetupRoles = true) => {
       const candidates = script.roles.filter((role) => role.alignment === alignment && !next.has(role.id) && !role.setupRules?.requiresNoEvil && (allowSetupRoles || !changesSetup(role)));
       const pool = random ? shuffled(candidates) : candidates;
@@ -692,8 +651,8 @@ export default function BoardBuilder() {
       let setupChanged = false;
       alignments.forEach((alignment) => {
         // 先移除普通角色；仍然超额时才移除会改配置的角色，并在本轮结束后重算名额。
-        const unlocked = (random ? shuffled(script.roles) : [...script.roles]).filter((role) => role.alignment === alignment && next.has(role.id) && !locked.has(role.id));
-        const removable = [...unlocked.filter(changesSetup),...unlocked.filter((role) => !changesSetup(role))];
+        const candidates = (random ? shuffled(script.roles) : [...script.roles]).filter((role) => role.alignment === alignment && next.has(role.id) && !keep.has(role.id));
+        const removable = [...candidates.filter(changesSetup),...candidates.filter((role) => !changesSetup(role))];
         while (alignmentCount(alignment) > targetQuota[alignment] && removable.length) {
           const role = removable.pop()!;
           next.delete(role.id); delete nextCopies[role.id];
@@ -723,7 +682,7 @@ export default function BoardBuilder() {
   function changeScript(id: string, library = availableScripts) {
     const nextScript = library.find((item) => item.id === id) ?? scripts[0];
     const nextCount = nextScript.counts[playerCount] ? playerCount : Number(Object.keys(nextScript.counts)[0] ?? 7);
-    setScriptId(nextScript.id); setPlayerCount(nextCount); setSelected(new Set()); setLocked(new Set()); setRoleCopies({}); setSetupChoices({}); setDemonBluffs([null,null,null]); setDrunkFakeRoleId(null); setSeats((current) => makeSeats(nextCount,current)); setActiveSeat(1); setCompletedSteps(new Set()); setAbilityTargets({}); setSnakeSwap(null); setAutomaticStatusEffects([]); setGameStarted(false); setGamePhase('firstNight'); setDayNumber(1); setGameLog([]); setAnnouncedDeadSeats(new Set()); setNarrationSeats([]); setNominations([]); setRingRotation(0); setView('roles');
+    setScriptId(nextScript.id); setPlayerCount(nextCount); setSelected(new Set()); setRoleCopies({}); setSetupChoices({}); setDemonBluffs([null,null,null]); setDrunkFakeRoleId(null); setSeats((current) => makeSeats(nextCount,current)); setActiveSeat(1); setCompletedSteps(new Set()); setAbilityTargets({}); setSnakeSwap(null); setAutomaticStatusEffects([]); setGameStarted(false); setGamePhase('firstNight'); setDayNumber(1); setGameLog([]); setAnnouncedDeadSeats(new Set()); setNarrationSeats([]); setNominations([]); setRingRotation(0); setView('roles');
   }
   function persistCustomScripts(next:ScriptDefinition[]) {
     try { window.localStorage.setItem(customScriptsKey,JSON.stringify(next)); }
@@ -798,19 +757,6 @@ export default function BoardBuilder() {
     const roles = shuffled(selectedRoleInstances);
     setSeats((current) => current.map((seat, index) => ({ ...seat, roleId:roles[index]?.id ?? null, alive:true, statuses:[] })));
     setAbilityTargets({}); setSnakeSwap(null); setAutomaticStatusEffects([]);
-  }
-  function swapSeats(from: number, to: number) {
-    if (from === to) return;
-    const fromSeat = seats.find((seat) => seat.number === from);
-    const toSeat = seats.find((seat) => seat.number === to);
-    if (!fromSeat || !toSeat) return;
-    setSeats((current) => current.map((seat) => seat.number === from ? { ...toSeat, number:from, name:fromSeat.name } : seat.number === to ? { ...fromSeat, number:to, name:toSeat.name } : seat));
-    setActiveSeat(to);
-    if (gameStarted) {
-      const fromRole = script.roles.find((role) => role.id === fromSeat.roleId)?.name ?? '未分配';
-      const toRole = script.roles.find((role) => role.id === toSeat.roleId)?.name ?? '未分配';
-      addLog('role',`${from}号与${to}号交换座位`,`${fromRole} ↔ ${toRole}`);
-    }
   }
   function changeSeatName(seatNumber: number, name: string) {
     setSeats((current) => current.map((seat) => seat.number === seatNumber ? { ...seat,name:name.slice(0,12) || undefined } : seat));
@@ -1070,11 +1016,11 @@ export default function BoardBuilder() {
           <div className="role-builder-layout">
             <Tabs defaultValue="townsfolk" className="role-tabs">
               <TabsList className="alignment-tabs" aria-label="按阵营浏览角色">{alignments.map((alignment) => <TabsTrigger key={alignment} value={alignment}>{alignmentMeta[alignment].short}<span>{script.roles.filter((role) => role.alignment === alignment).length}</span></TabsTrigger>)}</TabsList>
-              {alignments.map((alignment) => <TabsContent key={alignment} value={alignment}><div className="section-title"><h3>{alignmentMeta[alignment].label}</h3><p>勾选加入当前配板，锁定后随机配板会保留该角色。</p></div><div className="role-grid">{script.roles.filter((role) => role.alignment === alignment).map((role) => <RoleCard key={role.id} role={role} selected={selected.has(role.id)} locked={locked.has(role.id)} copies={Math.max(1,roleCopies[role.id] ?? 1)} setupChoice={setupChoices[role.id]} onSelect={() => toggleRole(role)} onLock={() => toggleLock(role)} onCopiesChange={(count) => changeRoleCopies(role,count)} onSetupChoiceChange={(value) => changeSetupChoice(role,value)}/>)}</div></TabsContent>)}
+              {alignments.map((alignment) => <TabsContent key={alignment} value={alignment}><div className="section-title"><h3>{alignmentMeta[alignment].label}</h3><p>勾选加入当前配板；“按名额补齐”会保留已选角色。</p></div><div className="role-grid">{script.roles.filter((role) => role.alignment === alignment).map((role) => <RoleCard key={role.id} role={role} selected={selected.has(role.id)} copies={Math.max(1,roleCopies[role.id] ?? 1)} setupChoice={setupChoices[role.id]} onSelect={() => toggleRole(role)} onCopiesChange={(count) => changeRoleCopies(role,count)} onSetupChoiceChange={(value) => changeSetupChoice(role,value)}/>)}</div></TabsContent>)}
             </Tabs>
             <aside className="board-panel">
               <div className="board-heading"><div><span className="eyebrow">本局阵容</span><h2>当前配板</h2></div><span className="total-count">{selectedRoleInstances.length}<small>/{playerCount}</small></span></div>
-              <div className="board-actions"><Button className="random-board" onClick={() => buildBoard(true)}><Dice5/>随机配板</Button><Button variant="outline" onClick={() => buildBoard(false)}><Sparkles/>按名额补齐</Button><Button variant="outline" onClick={() => { setSelected(new Set(locked)); setRoleCopies(Object.fromEntries([...locked].map((id) => [id,Math.max(1,roleCopies[id] ?? 1)]))); resetRoundState(); }}><RotateCcw/>清空未锁定</Button></div>
+              <div className="board-actions"><Button className="random-board" onClick={() => buildBoard(true)}><Dice5/>随机配板</Button><Button variant="outline" onClick={() => buildBoard(false)}><Sparkles/>按名额补齐</Button><Button variant="outline" onClick={() => { setSelected(new Set()); setRoleCopies({}); resetRoundState(); }}><RotateCcw/>清空配板</Button></div>
               {selected.has('drunk') && drunkRole && <section className="drunk-fake-role"><div className="drunk-fake-heading"><RoleIcon role={drunkRole}/><span><b>酒鬼的假身份</b><small>自动从不在场镇民中选择，并避开恶魔伪装</small></span><button onClick={randomizeDrunkFakeRole} disabled={!drunkFakeOptions.length}><Shuffle/>换一个</button></div><NativeSelect value={drunkFakeRoleId ?? ''} onChange={(event) => setDrunkFakeRoleId(event.target.value || null)} aria-label="酒鬼的假身份"><NativeSelectOption value="">暂无可用镇民</NativeSelectOption>{drunkFakeOptions.map((role) => <NativeSelectOption key={role.id} value={role.id}>{role.name}</NativeSelectOption>)}</NativeSelect></section>}
               <section className="demon-bluffs"><div className="bluff-heading"><div><EyeOff/><span><b>给恶魔的三个伪装</b><small>从不在场的善良角色中选三个</small></span></div><button onClick={randomizeBluffs} disabled={!selectedRoles.some((role) => role.alignment === 'demon') || availableBluffs.length < 3}><Shuffle/>随机准备</button></div>
                 {selectedRoles.some((role) => role.alignment === 'demon') ? <div className="bluff-slots">{demonBluffs.map((roleId,index) => {
@@ -1083,7 +1029,7 @@ export default function BoardBuilder() {
                   return <label className="bluff-slot" key={index}><span>{role ? <RoleIcon role={role}/> : <b>{index + 1}</b>}</span><NativeSelect value={roleId ?? ''} onChange={(event) => setBluff(index,event.target.value || null)} aria-label={`说书人准备的第${index + 1}个伪装`}><NativeSelectOption value="">说书人选择</NativeSelectOption>{options.map((item) => <NativeSelectOption key={item.id} value={item.id}>{item.name} · {alignmentMeta[item.alignment].short}</NativeSelectOption>)}</NativeSelect></label>;
                 })}</div> : <p className="bluff-empty">选入恶魔后再准备。</p>}
               </section>
-              <div className="selected-groups">{alignments.map((alignment) => <section key={alignment} className={`selected-group group-${alignment}`}><div><span>{alignmentMeta[alignment].short}</span><b>{totals[alignment]} / {quota[alignment]}</b></div><ul>{selectedRoles.filter((role) => role.alignment === alignment).map((role) => <li key={role.id}><RoleIcon role={role} className="mini-role-icon"/>{role.name}{(roleCopies[role.id] ?? 1) > 1 && <b>×{roleCopies[role.id]}</b>}{locked.has(role.id) && <Lock size={11}/>}</li>)}</ul>{!totals[alignment] && <p>尚未选择</p>}</section>)}</div>
+              <div className="selected-groups">{alignments.map((alignment) => <section key={alignment} className={`selected-group group-${alignment}`}><div><span>{alignmentMeta[alignment].short}</span><b>{totals[alignment]} / {quota[alignment]}</b></div><ul>{selectedRoles.filter((role) => role.alignment === alignment).map((role) => <li key={role.id}><RoleIcon role={role} className="mini-role-icon"/>{role.name}{(roleCopies[role.id] ?? 1) > 1 && <b>×{roleCopies[role.id]}</b>}</li>)}</ul>{!totals[alignment] && <p>尚未选择</p>}</section>)}</div>
               <section className="validation"><h3><ShieldCheck size={17}/>基础校验</h3><div className="message-list">{messages.map((message,index) => <div key={`${message.text}-${index}`} className={`message message-${message.type}`}>{message.type === 'warn' ? <AlertTriangle size={15}/> : message.type === 'ok' ? <Check size={15}/> : <CircleHelp size={15}/>}<span>{message.text}</span></div>)}</div></section>
             </aside>
           </div>
@@ -1091,7 +1037,7 @@ export default function BoardBuilder() {
 
         {view === 'seats' && <section className="seat-workspace">
           <div className="view-heading"><div><span className="eyebrow">圆桌魔典</span><h3>环形座位</h3></div><div><Button onClick={randomizeSeats} disabled={!selectedRoleInstances.length}><Shuffle/>随机入座</Button><Button variant="outline" onClick={() => setRingRotation(0)} disabled={Math.abs(ringRotation) < 0.5}><RotateCcw/>方向归零</Button><Button variant="outline" onClick={() => { setSeats((current) => makeSeats(playerCount,current)); setAbilityTargets({}); setSnakeSwap(null); setAutomaticStatusEffects([]); }}><Trash2/>清空座位</Button></div></div>
-          <SeatMap seats={seats} roles={script.roles} activeSeat={activeSeat} targetMarks={targetMarks} rotation={ringRotation} drunkFakeRoleId={drunkFakeRoleId} onRotationChange={setRingRotation} onSelect={setActiveSeat} onSwap={swapSeats}/>
+          <SeatMap seats={seats} roles={script.roles} activeSeat={activeSeat} targetMarks={targetMarks} rotation={ringRotation} drunkFakeRoleId={drunkFakeRoleId} onRotationChange={setRingRotation} onSelect={setActiveSeat}/>
           <div className="seat-editor">
             <div className="seat-editor-number"><span>{activeSeatState.number}</span><div><b>{activeSeatState.number}号座位</b><small>{activeSeatState.alive ? '当前存活' : '当前死亡'}</small></div><input className="seat-name-input" value={activeSeatState.name ?? ''} maxLength={12} placeholder="玩家昵称（可选）" onChange={(event) => changeSeatName(activeSeatState.number,event.target.value)} aria-label={`${activeSeatState.number}号玩家昵称`}/></div>
             <label><span>身份</span><NativeSelect value={activeSeatState.roleId ?? ''} onChange={(event) => assignRole(activeSeatState.number, event.target.value || null)} aria-label={`${activeSeatState.number}号身份`}><NativeSelectOption value="">未分配身份</NativeSelectOption>{alignments.map((alignment) => <optgroup key={alignment} label={alignmentMeta[alignment].short}>{selectedRoles.filter((role) => role.alignment === alignment).map((role) => <NativeSelectOption key={role.id} value={role.id}>{role.name}</NativeSelectOption>)}</optgroup>)}</NativeSelect></label>
