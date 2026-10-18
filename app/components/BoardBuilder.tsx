@@ -141,6 +141,9 @@ function RoleCard({ role, selected, copies, setupChoice, onSelect, onCopiesChang
 function SeatMap({ seats, roles, activeSeat, targetMarks, rotation, drunkFakeRoleId, onRotationChange, onSelect }: { seats: Seat[]; roles: Role[]; activeSeat: number; targetMarks:Record<number,string[]>; rotation:number; drunkFakeRoleId:string|null; onRotationChange:(rotation:number) => void; onSelect: (number: number) => void }) {
   const [rotating, setRotating] = useState(false);
   const rotationDrag = useRef<{ pointerId:number; startAngle:number; startRotation:number }|null>(null);
+  // 11 人及以上时手机端座位卡缩小并外移，避免相邻卡片重叠。
+  const crowded = seats.length >= 11;
+  const mobileRadius = crowded ? 42 : 38;
   const aliveCount = seats.filter((seat) => seat.alive).length;
   const deathsUntilEvilWin = Math.max(0, aliveCount - 2);
   const demonSeats = seats.filter((seat) => roles.find((role) => role.id === seat.roleId)?.alignment === 'demon');
@@ -166,7 +169,7 @@ function SeatMap({ seats, roles, activeSeat, targetMarks, rotation, drunkFakeRol
     rotationDrag.current = null;
     setRotating(false);
   };
-  return <div className={`seat-ring ${rotating ? 'is-rotating' : ''}`} aria-label={`${seats.length}人环形座位图；拖动空白处可旋转`} onPointerDown={beginRotation} onPointerMove={moveRotation} onPointerUp={finishRotation} onPointerCancel={finishRotation}>
+  return <div className={`seat-ring ${rotating ? 'is-rotating' : ''} ${crowded ? 'is-crowded' : ''}`} aria-label={`${seats.length}人环形座位图；拖动空白处可旋转`} onPointerDown={beginRotation} onPointerMove={moveRotation} onPointerUp={finishRotation} onPointerCancel={finishRotation}>
     <span className="ring-rotate-hint" aria-hidden="true">拖动空白处旋转</span>
     <div className="ring-lines" aria-hidden="true"><span/><span/><span/></div>
     <div className={`ring-center ${demonDefeated ? 'is-good-win' : ''}`}><span>{aliveCount}</span><small>存活</small><b>{seats.length} 人魔典</b><em>{demonDefeated ? '恶魔死亡 · 善良胜利' : deathsUntilEvilWin ? `再死亡 ${deathsUntilEvilWin} 人` : '已到邪恶胜利线'}</em></div>
@@ -184,8 +187,8 @@ function SeatMap({ seats, roles, activeSeat, targetMarks, rotation, drunkFakeRol
         style={{
           '--seat-left': `${50 + Math.sin(angle) * 43}%`,
           '--seat-top': `${50 - Math.cos(angle) * 43}%`,
-          '--seat-left-mobile': `${50 + Math.sin(angle) * 38}%`,
-          '--seat-top-mobile': `${50 - Math.cos(angle) * 38}%`,
+          '--seat-left-mobile': `${50 + Math.sin(angle) * mobileRadius}%`,
+          '--seat-top-mobile': `${50 - Math.cos(angle) * mobileRadius}%`,
         } as CSSProperties}
         onClick={() => onSelect(seat.number)}
         aria-label={`${seatTitle(seat)}，${role?.name ?? '未分配'}，${seat.alive ? '存活' : '死亡'}`}

@@ -228,7 +228,7 @@ button,select { font:inherit; } button { cursor:pointer; }
 .ring-center em { margin-top:4px; color:#e6c78a; font-size:9px; font-style:normal; font-weight:800; }
 .ring-center.is-good-win { background:#285f49; box-shadow:0 0 0 7px #1c493a88; }
 .ring-center.is-good-win em { color:#d9f0df; }
-.seat-token { position:absolute; left:var(--seat-left); top:var(--seat-top); width:100px; min-height:57px; z-index:3; transform:translate(-50%,-50%); border:1px solid #b6aa98; border-radius:8px; padding:7px 8px; text-align:left; color:#435052; background:#fffdf8; box-shadow:0 5px 13px #564d4028; transition:transform .17s,border-color .17s,box-shadow .17s,opacity .17s; cursor:grab; touch-action:none; user-select:none; }
+.seat-token { position:absolute; left:var(--seat-left); top:var(--seat-top); width:112px; min-height:57px; z-index:3; transform:translate(-50%,-50%); border:1px solid #b6aa98; border-radius:8px; padding:7px 6px; text-align:left; color:#435052; background:#fffdf8; box-shadow:0 5px 13px #564d4028; transition:transform .17s,border-color .17s,box-shadow .17s,opacity .17s; cursor:grab; touch-action:none; user-select:none; }
 .seat-token.seat-townsfolk,.seat-token.seat-outsider { border-color:#6b9dbd; color:#174e72; background:linear-gradient(145deg,#f5fbff 0%,#dceef9 100%); box-shadow:inset 3px 0 0 #3e83b3,0 5px 13px #335f7a2b; }
 .seat-token.seat-outsider { border-color:#7f9fbd; background:linear-gradient(145deg,#f2f8fd 0%,#d6e5f1 100%); box-shadow:inset 3px 0 0 #6487a8,0 5px 13px #335f7a2b; }
 .seat-token.seat-minion,.seat-token.seat-demon { border-color:#bb746a; color:#772f29; background:linear-gradient(145deg,#fff7f4 0%,#f3dcd6 100%); box-shadow:inset 3px 0 0 #b44e43,0 5px 13px #783d352b; }
@@ -240,8 +240,9 @@ button,select { font:inherit; } button { cursor:pointer; }
 .seat-token>span { display:flex; align-items:center; justify-content:space-between; gap:4px; }
 .seat-token b { color:currentColor; opacity:.72; font-size:10px; }
 .seat-token i { color:#347055; font-size:9px; font-style:normal; font-weight:800; }
-.seat-token strong { display:flex; align-items:center; justify-content:center; gap:5px; overflow:hidden; margin-top:4px; color:#1c5056; font-family:var(--font-display); font-size:13px; text-align:center; white-space:nowrap; }
-.seat-token strong span { overflow:hidden; text-overflow:ellipsis; }
+.seat-token strong { display:flex; align-items:center; justify-content:center; gap:5px; overflow:hidden; margin-top:4px; color:#1c5056; font-family:var(--font-display); font-size:13px; text-align:center; white-space:nowrap; letter-spacing:0; }
+/* 角色名最多两行，不再截成“罂…”。 */
+.seat-token strong span { display:-webkit-box; overflow:hidden; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-height:1.2; white-space:normal; word-break:break-all; }
 .seat-token strong .role-icon { width:25px; height:25px; border-color:#ffffffbb; }
 .seat-fake-role { display:block!important; margin-top:3px; overflow:hidden; color:#7d6330!important; font-size:9px!important; font-weight:800; text-align:center; text-overflow:ellipsis; white-space:nowrap; }
 .seat-token.seat-minion strong,.seat-token.seat-demon strong { color:#8e3e35; }
@@ -534,5 +535,7 @@ button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-vis
 }
 @media(max-width:760px){.night-target-picker>.night-confirm-death{display:flex}.night-confirm-death button{min-height:44px;flex:1;justify-content:center}.night-confirm-death small{flex-basis:100%}}
 @media(max-width:760px){.seat-name-input{flex:1 1 100%;width:100%;height:44px;font-size:14px}.nomination-shortcut{min-height:42px}.nomination-panel{margin:-4px 0 15px}.nomination-form{grid-template-columns:1fr 1fr;justify-content:stretch}.nomination-form button{grid-column:1/-1;height:44px}.nomination-form select{min-height:44px;font-size:14px}.nomination-panel li{gap:6px;padding:6px 0}.nomination-pair{gap:2px;white-space:nowrap;font-size:12px}.vote-stepper button{width:36px;height:42px}.vote-stepper input{height:42px;width:40px}.nomination-execute{height:42px;padding:0 9px}.nomination-remove{width:36px;height:42px;border-radius:6px}.vote-toggle{font-size:12px}}
+/* 手机：头像移到右上角与座位号同行，角色名独占一行。 */
+@media(max-width:760px){.seat-token{padding:5px 4px}.seat-token strong{display:block;margin-top:9px;font-size:11px;letter-spacing:0;text-align:center}.seat-token strong .role-icon{position:absolute;top:4px;right:4px;width:22px;height:22px}.seat-ring.is-crowded .seat-token{width:54px;min-height:40px;padding:4px 2px}.seat-ring.is-crowded .seat-token b{font-size:9px}.seat-ring.is-crowded .seat-token strong{margin-top:7px;font-size:9.5px}.seat-ring.is-crowded .seat-token strong .role-icon{width:18px;height:18px;top:3px;right:3px}}
 /* 触屏不在圆桌上弹出技能卡（无法点掉且会挡住座位），改在下方座位编辑里显示。 */
 @media(hover:none){.seat-token>.seat-ability-card{display:none!important}.seat-editor-ability{display:block}}
