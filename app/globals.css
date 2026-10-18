@@ -282,6 +282,8 @@ button,select { font:inherit; } button { cursor:pointer; }
 .seat-editor-number>span { width:42px; height:42px; display:grid; place-items:center; border-radius:50%; color:#fff; background:#174e55; font-family:var(--font-display); font-size:20px; }
 .seat-editor-number div { display:flex; flex-direction:column; }
 .seat-editor-number b { font-size:13px; }
+.seat-editor-ability { display:none; grid-column:1/-1; margin:0; padding:9px 11px; border-left:3px solid #9c7340; background:#faf5e9; color:#4e4a42; font-size:13px; line-height:1.55; }
+.seat-editor-ability b { margin-right:6px; color:#24383a; }
 .seat-editor-number small { margin-top:2px; color:#77776f; font-size:10px; }
 .seat-editor-number { flex-wrap:wrap; }
 .seat-name-input { width:150px; height:32px; border:1px solid #cfc4b2; border-radius:5px; padding:0 9px; background:#faf7ef; color:#24383a; font-size:12px; }
@@ -537,4 +539,5 @@ button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-vis
 }
 @media(max-width:760px){.night-target-picker>.night-confirm-death{display:flex}.night-confirm-death button{min-height:44px;flex:1;justify-content:center}.night-confirm-death small{flex-basis:100%}}
 @media(max-width:760px){.seat-name-input{flex:1 1 100%;width:100%;height:44px;font-size:14px}.nomination-shortcut{min-height:42px}.nomination-panel{margin:-4px 0 15px}.nomination-form{grid-template-columns:1fr 1fr;justify-content:stretch}.nomination-form button{grid-column:1/-1;height:44px}.nomination-form select{min-height:44px;font-size:14px}.nomination-panel li{gap:6px;padding:6px 0}.nomination-pair{gap:2px;white-space:nowrap;font-size:12px}.vote-stepper button{width:36px;height:42px}.vote-stepper input{height:42px;width:40px}.nomination-execute{height:42px;padding:0 9px}.nomination-remove{width:36px;height:42px;border-radius:6px}.vote-toggle{font-size:12px}}
-@media(hover:none){.seat-token:hover>.seat-ability-card{display:none}.seat-token.is-active>.seat-ability-card{display:block}.seat-token.is-dragging>.seat-ability-card{display:none}}
+/* 触屏不在圆桌上弹出技能卡（无法点掉且会挡住座位），改在下方座位编辑里显示。 */
+@media(hover:none){.seat-token>.seat-ability-card{display:none!important}.seat-editor-ability{display:block}}

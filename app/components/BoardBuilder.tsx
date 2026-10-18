@@ -481,6 +481,7 @@ export default function BoardBuilder() {
   }, [drunkFakeRoleId,nightMode,script.nightOrder,script.roles,selected]);
   const todaysNominations = nominations.filter((item) => item.dayNumber === dayNumber);
   const activeSeatState = seats.find((seat) => seat.number === activeSeat) ?? seats[0];
+  const activeSeatRole = script.roles.find((role) => role.id === activeSeatState.roleId);
   const totals = useMemo(() => Object.fromEntries(alignments.map((alignment) => [alignment, selectedRoles.filter((role) => role.alignment === alignment).reduce((total,role) => total + Math.max(1,roleCopies[role.id] ?? 1),0)])) as Record<Alignment, number>, [roleCopies,selectedRoles]);
   const targetMarks = useMemo(() => {
     const marks: Record<number,string[]> = {};
@@ -1095,6 +1096,7 @@ export default function BoardBuilder() {
             <div className="seat-editor-number"><span>{activeSeatState.number}</span><div><b>{activeSeatState.number}号座位</b><small>{activeSeatState.alive ? '当前存活' : '当前死亡'}</small></div><input className="seat-name-input" value={activeSeatState.name ?? ''} maxLength={12} placeholder="玩家昵称（可选）" onChange={(event) => changeSeatName(activeSeatState.number,event.target.value)} aria-label={`${activeSeatState.number}号玩家昵称`}/></div>
             <label><span>身份</span><NativeSelect value={activeSeatState.roleId ?? ''} onChange={(event) => assignRole(activeSeatState.number, event.target.value || null)} aria-label={`${activeSeatState.number}号身份`}><NativeSelectOption value="">未分配身份</NativeSelectOption>{alignments.map((alignment) => <optgroup key={alignment} label={alignmentMeta[alignment].short}>{selectedRoles.filter((role) => role.alignment === alignment).map((role) => <NativeSelectOption key={role.id} value={role.id}>{role.name}</NativeSelectOption>)}</optgroup>)}</NativeSelect></label>
             <Button variant={activeSeatState.alive ? 'outline' : 'destructive'} onClick={() => toggleSeatAlive(activeSeatState.number)}>{activeSeatState.alive ? <><UserRound/>标记死亡</> : <><Sparkles/>恢复存活</>}</Button>
+            {activeSeatRole && <p className="seat-editor-ability"><b>{activeSeatRole.name}</b>{activeSeatRole.ability}</p>}
             <div className="seat-status-editor"><span>状态标记</span><div>{availableSeatStatuses.map((status) => <button key={status} className={`${activeSeatState.statuses.includes(status) ? 'is-active' : ''} status-${status}`} onClick={() => toggleSeatStatus(activeSeatState.number,status)} aria-pressed={activeSeatState.statuses.includes(status)}>{seatStatusMeta[status].short}<b>{seatStatusMeta[status].label}</b></button>)}</div></div>
           </div>
         </section>}
